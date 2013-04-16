@@ -1,13 +1,16 @@
-/* post_auction_proxy.cc
+/* adserver_connector.cc
    Jeremy Barnes, 19 December 2012
    Copyright (c) 2012 Datacratic Inc.  All rights reserved.
 
-   A class that proxies post auction events to the post auction loop.
+   Base class to connect to an ad server.  We also have an http ad server
+   connector that builds on top of this.
 */
 
 
-#include "post_auction_proxy.h"
-#include "rtbkit/core/post_auction/post_auction_loop.h"
+#include "adserver_connector.h"
+
+#include "rtbkit/common/auction_events.h"
+
 
 using namespace std;
 
@@ -18,32 +21,34 @@ namespace RTBKIT {
 /* POST AUCTION PROXY                                                        */
 /*****************************************************************************/
 
-PostAuctionProxy::
-PostAuctionProxy(std::shared_ptr<zmq::context_t> context)
-    : toPostAuctionService(context)
+AdServerConnector::
+AdServerConnector(std::shared_ptr<Datacratic::ServiceProxies> & proxy,
+                  const std::string & serviceName)
+    : ServiceBase(serviceName, proxy),
+      toPostAuctionService(proxy->zmqContext)
 {
 }
 
-PostAuctionProxy::
-~PostAuctionProxy()
+AdServerConnector::
+~AdServerConnector()
 {
 }
 
 void
-PostAuctionProxy::
-init(std::shared_ptr<ConfigurationService> config)
+AdServerConnector::
+init(shared_ptr<ConfigurationService> config)
 {
     toPostAuctionService.init(config, ZMQ_XREQ);
-    toPostAuctionService.connectToServiceClass("rtbPostAuctionService", "events");
+    toPostAuctionService.connectToServiceClass("rtbPostAuctionService",
+                                               "events");
 
 #if 0 // later, for when we have multiple
 
     toPostAuctionServices.init(getServices()->config, name);
-    toPostAuctionServices.connectHandler = [=] (const std::string & connectedTo)
-        {
-            cerr << "PostAuctionProxy is connected to post auction service "
-            << connectedTo << endl;
-        };
+    toPostAuctionServices.connectHandler = [=] (const string & connectedTo) {
+        cerr << "AdServerConnector is connected to post auction service "
+        << connectedTo << endl;
+    };
     toPostAuctionServices.connectAllServiceProviders("rtbPostAuctionService",
                                                      "agents");
     toPostAuctionServices.connectToServiceClass();
@@ -51,27 +56,27 @@ init(std::shared_ptr<ConfigurationService> config)
 }
 
 void
-PostAuctionProxy::
+AdServerConnector::
 start()
 {
 }
 
 void
-PostAuctionProxy::
+AdServerConnector::
 shutdown()
 {
 }
 
 void
-PostAuctionProxy::
-injectWin(const Id & auctionId,
-          const Id & adSpotId,
-          Amount winPrice,
-          Date timestamp,
-          const JsonHolder & winMeta,
-          const UserIds & ids,
-          const AccountKey & account,
-          Date bidTimestamp)
+AdServerConnector::
+publishWin(const Id & auctionId,
+           const Id & adSpotId,
+           Amount winPrice,
+           Date timestamp,
+           const JsonHolder & winMeta,
+           const UserIds & ids,
+           const AccountKey & account,
+           Date bidTimestamp)
 {
     PostAuctionEvent event;
     event.type = PAE_WIN;
@@ -89,13 +94,13 @@ injectWin(const Id & auctionId,
 }
 
 void
-PostAuctionProxy::
-injectLoss(const Id & auctionId,
-           const Id & adSpotId,
-           Date timestamp,
-           const JsonHolder & lossMeta,
-           const AccountKey & account,
-           Date bidTimestamp)
+AdServerConnector::
+publishLoss(const Id & auctionId,
+            const Id & adSpotId,
+            Date timestamp,
+            const JsonHolder & lossMeta,
+            const AccountKey & account,
+            Date bidTimestamp)
 {
     PostAuctionEvent event;
     event.type = PAE_LOSS;
@@ -111,13 +116,13 @@ injectLoss(const Id & auctionId,
 }
 
 void
-PostAuctionProxy::
-injectCampaignEvent(const string & label,
-                    const Id & auctionId,
-                    const Id & adSpotId,
-                    Date timestamp,
-                    const JsonHolder & impressionMeta,
-                    const UserIds & ids)
+AdServerConnector::
+publishCampaignEvent(const string & label,
+                     const Id & auctionId,
+                     const Id & adSpotId,
+                     Date timestamp,
+                     const JsonHolder & impressionMeta,
+                     const UserIds & ids)
 {
     PostAuctionEvent event;
     event.type = PAE_CAMPAIGN_EVENT;
