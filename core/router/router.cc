@@ -1810,13 +1810,6 @@ doBid(const std::vector<std::string> & message)
             continue;
         }
 
-        if (!creative.biddable(auctionInfo.auction->request->exchange,
-                        auctionInfo.auction->request->protocolVersion)) {
-            returnInvalidBid(i, "creativeNotBiddableOnExchange",
-                    "creative not biddable on exchange/version");
-            continue;
-        }
-
         doProfileEvent(6, "creativeCompatibility");
 
         string auctionKey

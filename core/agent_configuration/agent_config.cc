@@ -102,14 +102,6 @@ compatible(const AdSpot & adspot) const
     return adspot.formats.compatible(format);
 }
 
-bool
-Creative::
-biddable(const std::string & exchange,
-         const std::string & protocolVersion) const
-{
-    return true;
-}
-
 Json::Value jsonPrint(const Creative & c)
 {
     return c.toJson();
@@ -787,13 +779,36 @@ canBid(const ExchangeConnector * exchangeConnector,
 {
     BiddableSpots result;
 
+#if 0
+    if (exchangeConnector) {
+        exchangeName = exchangeConnector->exchangeName();
+
+        auto it = providerData.find(exchangeName);
+        if (it == providerData.end()) {
+            if (doFilterStat)
+                doFilterStat("static.001_exchangeRejectedCampaign");
+            return BiddableSpots();
+        }
+
+        exchangeInfo = it->second.get();
+
+        /* Now we know the exchange connector likes the campaign, we
+           should check that the campaign and bid request are compatible.
+           
+           First we pre-filter
+        */
+        if (!exchangeConnector->bidRequestPreFilter(request, *this, exchangeInfo)) {
+            if (doFilterStat)
+                doFilterStat("static.001_exchangeMismatchBidRequestCampaignPre");
+            return BiddableSpots();
+        }
+    }
+#endif
+
     // TODO: do a lookup, not an exhaustive scan
     for (unsigned i = 0;  i < spots.size();  ++i) {
         //cerr << "trying spot " << i << endl;
 
-        auto it = providerData;
-        
-        
         // Check that the fold position matches
         if (!foldPositionFilter.isIncluded(spots[i].position))
             continue;
@@ -804,7 +819,6 @@ canBid(const ExchangeConnector * exchangeConnector,
     //             << " creative: " << creatives[j].width << "x"
     //             << creatives[j].height << endl;
             if (creatives[j].compatible(spots[i])
-                && creatives[j].biddable(exchange, protocolVersion)
                 && creatives[j].exchangeFilter.isIncluded(exchange)
                 && creatives[j].languageFilter.isIncluded(language)
                 && creatives[j].locationFilter.isIncluded(location, locationHash, locationCache))
@@ -827,7 +841,7 @@ isBiddableRequest(const ExchangeConnector * exchangeConnector,
 {
     /* First, check that the exchange has blessed this campaign as being
        biddable.  If not, we don't go any further. */
-    const void * exchangeInfo;
+    const void * exchangeInfo = 0;
     std::string exchangeName;
 
     if (exchangeConnector) {

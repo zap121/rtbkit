@@ -82,10 +82,6 @@ struct Creative {
 
     /** Is the given ad spot compatible with the given creative format? */
     bool compatible(const AdSpot & spot) const;
-
-    /** Is this creative biddable on the given exchange and protocol version? */
-    bool biddable(const std::string & exchange,
-                  const std::string & protocolVersion) const;
 };
 
 
