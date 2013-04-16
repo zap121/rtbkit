@@ -481,7 +481,6 @@ public:
                          Amount price = Amount(),
                          const Auction * auction = 0,
                          const std::string & bidData = "",
-                         const Json::Value & unused1 = Json::Value(),
                          const Json::Value & metadata = Json::Value(),
                          const std::string & augmentationsStr = "");
                          

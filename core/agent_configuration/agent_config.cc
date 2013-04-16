@@ -713,7 +713,6 @@ toJson(bool includeCreatives) const
     if (!hourOfWeekFilter.isDefault()) {
         result["hourOfWeekFilter"] = hourOfWeekFilter.toJson();
     }
-    result["tagFilter"] = tagFilter.toJson();
 
     if (!foldPositionFilter.empty()) {
         result["foldPositionFilter"] = foldPositionFilter.toJson();
@@ -841,7 +840,7 @@ isBiddableRequest(const ExchangeConnector * exchangeConnector,
 {
     /* First, check that the exchange has blessed this campaign as being
        biddable.  If not, we don't go any further. */
-    const void * exchangeInfo = 0;
+    const void * exchangeInfo = nullptr;
     std::string exchangeName;
 
     if (exchangeConnector) {

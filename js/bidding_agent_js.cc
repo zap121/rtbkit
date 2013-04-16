@@ -63,27 +63,26 @@ struct ResultCbOps:
         {
         }
 
-        void operator () (const RTBKIT::BiddingAgent::BidResultArgs & args)
+        void operator () (const RTBKIT::BidResult & args)
         {
             v8::HandleScope scope;
             JSValue result;
             {
                 v8::TryCatch tc;
-                v8::Handle<v8::Value> argv[10];
+                v8::Handle<v8::Value> argv[9];
                 argv[0] = JS::toJS(args.timestamp);
                 argv[1] = JS::toJS(args.confidence);
                 argv[2] = JS::toJS(args.auctionId);
                 argv[3] = JS::toJS(args.spotNum);
-                argv[4] = JS::toJS(args.secondPrice);
+                argv[4] = JS::toJS(static_cast<int64_t>(MicroUSD(args.secondPrice)));
                 if (args.request)
                     argv[5] = JS::toJS(args.request);
                 else argv[5] = v8::Null();
                 argv[6] = JS::toJS(args.ourBid);
-                argv[7] = JS::toJS(args.accountInfo);
-                argv[8] = JS::toJS(args.metadata);
-                argv[9] = JS::toJS(args.augmentations);
+                argv[7] = JS::toJS(args.metadata);
+                argv[8] = JS::toJS(args.augmentations);
 
-                result = params->fn->Call(params->This, 10, argv);
+                result = params->fn->Call(params->This, 9, argv);
 
                 if (result.IsEmpty()) {
                     if(tc.HasCaught()) {
@@ -141,7 +140,7 @@ struct DeliveryCbOps :
         {
         }
 
-        void operator () (const RTBKIT::BiddingAgent::DeliveryArgs & args)
+        void operator () (const RTBKIT::DeliveryEvent & args)
         {
             v8::HandleScope scope;
             JSValue result;
@@ -154,12 +153,12 @@ struct DeliveryCbOps :
                 argv[2] = JS::toJS(args.spotId);
                 argv[3] = JS::toJS(args.spotIndex);
                 argv[4] = JS::toJS(args.bidRequest);
-                argv[5] = JS::toJS(args.bid);
-                argv[6] = JS::toJS(args.win);
-                argv[7] = JS::toJS(args.impression);
-                argv[8] = JS::toJS(args.click);
+                argv[5] = JS::toJS(args.bid.toJson());
+                argv[6] = JS::toJS(args.win.toJson());
+                argv[7] = JS::toJS(args.impressionToJson());
+                argv[8] = JS::toJS(args.clickToJson());
                 argv[9] = JS::toJS(args.augmentations);
-                argv[10] = JS::toJS(args.visits);
+                argv[10] = JS::toJS(args.visitsToJson());
 
                 result = params->fn->Call(params->This, 11, argv);
 
@@ -248,6 +247,7 @@ struct BiddingAgentJS :
         registerMemberFn(&RTBKIT::BiddingAgent::init, "init");
         registerMemberFn(&RTBKIT::BiddingAgent::start, "start");
         registerMemberFn(&RTBKIT::BiddingAgent::shutdown, "close");
+        registerMemberFn(&RTBKIT::BiddingAgent::strictMode, "strictMode");
 
         registerAsyncCallback(&RTBKIT::BiddingAgent::onBidRequest, "onBidRequest");
         registerAsyncCallback(&RTBKIT::BiddingAgent::onPing, "onPing");

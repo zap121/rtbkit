@@ -1721,7 +1721,7 @@ doBid(const std::vector<std::string> & message)
                  formatted, auctionId,
                  i, Amount(),
                  auctionInfo.auction.get(),
-                 biddata, Json::Value(), Json::Value(),
+                 biddata, Json::Value(),
                  auctionInfo.auction->agentAugmentations[agent]);
         };
 
@@ -1828,8 +1828,7 @@ doBid(const std::vector<std::string> & message)
                     this->getCurrentTime(),
                     "guaranteed", auctionId, 0, Amount(),
                     auctionInfo.auction.get(),
-                    biddata, Json::Value(), meta,
-                    agentAugmentations);
+                    biddata, meta, agentAugmentations);
             this->logMessage("NOBUDGET", agent, auctionId,
                     biddata, meta);
             continue;
@@ -1915,8 +1914,7 @@ doBid(const std::vector<std::string> & message)
                     this->getCurrentTime(),
                     "guaranteed", auctionId, 0, Amount(),
                     auctionInfo.auction.get(),
-                    biddata, Json::Value(), meta,
-                    agentAugmentations);
+                    biddata, meta, agentAugmentations);
             this->logMessage(msg, agent, auctionId, biddata, meta);
             continue;
         }
@@ -2125,7 +2123,6 @@ doSubmitted(std::shared_ptr<Auction> auction)
                             0, Amount(),
                             auction.get(),
                             response.bidData,
-                            Json::Value(),
                             response.meta,
                             auction->agentAugmentations[response.agent]);
         }
@@ -2485,7 +2482,6 @@ sendBidResponse(const std::string & agent,
                 Amount price,
                 const Auction * auction,
                 const std::string & bidData,
-                const Json::Value & unused1,
                 const Json::Value & metadata,
                 const std::string & augmentationsStr)
 {
@@ -2496,26 +2492,16 @@ sendBidResponse(const std::string & agent,
     default:       format = info.config->errorFormat;  break;
     }
 
-    const char * statusStr;
-    switch (status) {
-    case BS_WIN:        statusStr = "WIN";  break;
-    case BS_LOSS:       statusStr = "LOSS";  break;
-    case BS_TOOLATE:    statusStr = "TOOLATE";  break;
-    case BS_INVALID:    statusStr = "INVALID";  break;
-    case BS_LOSTBID:    statusStr = "LOSTBID";  break;
-    case BS_DROPPEDBID: statusStr = "DROPPEDBID";  break;
-    case BS_NOBUDGET:   statusStr = "NOBUDGET";  break;
-    default:
-        throw ML::Exception("unknown bid status");
-    }
+    const char * statusStr = bidStatusToChar(status);
 
     switch (format) {
     case BRF_FULL:
         sendAgentMessage(agent, statusStr, timestamp, message, auctionId,
                          to_string(spotNum),
                          price.toString(),
+                         (auction ? info.getBidRequestEncoding(*auction) : ""),
                          (auction ? info.encodeBidRequest(*auction) : ""),
-                         bidData, unused1, metadata, augmentationsStr);
+                         bidData, metadata, augmentationsStr);
         break;
 
     case BRF_LIGHTWEIGHT:

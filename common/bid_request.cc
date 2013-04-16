@@ -109,11 +109,13 @@ DefaultDescription()
     onUnknownField = [=] (BidRequest * br, JsonParsingContext & context)
         {
             //context.skip();
-
-            cerr << "got unknown field " << context.printPath()
-            << " " << context.expectJson().toString() << endl;
-
-#if 0
+            if(context.printPath().find("!!CV") != std::string::npos)
+            {
+               context.skip();
+            }
+            else
+            {
+               cerr << "(default description)got unknown field " << context.printPath() << endl;
             std::function<Json::Value & (int, Json::Value &)> getEntry
             = [&] (int n, Json::Value & curr) -> Json::Value &
             {
@@ -126,7 +128,7 @@ DefaultDescription()
 
             getEntry(0, br->unparseable)
             = context.expectJson();
-#endif
+            }
         };
     addField("id", &BidRequest::auctionId, "Exchange auction ID");
     addField("timestamp", &BidRequest::timestamp, "Bid request timestamp");
@@ -548,7 +550,7 @@ fromJson(const Json::Value & val)
     // in the unparseable array via this function
     auto onUnknownField = [&] ()
         {
-            cerr << "got unknown field " << context.printPath()
+            cerr << "(adspot)got unknown field " << context.printPath()
             << context.expectJson() << endl;
             
 #if 0
@@ -1162,8 +1164,9 @@ parse(const std::string & source, const std::string & bidRequest)
     }
 
     if (source == "datacratic" || strncmp(bidRequest.c_str(), "{\"!!CV\":", 8) == 0)
+    {
         return CanonicalParser::parse(bidRequest);
-
+    }
     Parser parser = getParser(source);
 
     //cerr << "got parser for source " << source << endl;

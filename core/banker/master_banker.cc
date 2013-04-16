@@ -147,7 +147,7 @@ saveAll(const Accounts & toSave, OnSavedCallback onSaved)
 
             /* All accounts known to the banker are fetched.
                We need to check them and restore them (if needed). */
-            for (int i; i < reply.length(); i++) {
+            for (int i = 0; i < reply.length(); i++) {
                 const string & key = keys[i];
                 bool isParentAccount(key.find(":") == string::npos);
                 const Accounts::AccountInfo & bankerAccount
@@ -294,8 +294,7 @@ MasterBanker::
         cerr << "awaiting end of save operation..." << endl;
         ML::futex_wait(saving, true);
     }
-    unregisterServiceProvider(serviceName(), { "rtbBanker" });
-    monitorProviderClient.shutdown();
+    shutdown();
 }
 
 void
@@ -489,6 +488,7 @@ void
 MasterBanker::
 shutdown()
 {
+    unregisterServiceProvider(serviceName(), { "rtbBanker" });
     RestServiceEndpoint::shutdown();
     monitorProviderClient.shutdown();
 }
