@@ -22,10 +22,10 @@ namespace RTBKIT {
 /*****************************************************************************/
 
 AdServerConnector::
-AdServerConnector(std::shared_ptr<Datacratic::ServiceProxies> & proxy,
-                  const std::string & serviceName)
+AdServerConnector(const std::string & serviceName,
+                  std::shared_ptr<Datacratic::ServiceProxies> & proxy)
     : ServiceBase(serviceName, proxy),
-      toPostAuctionService(proxy->zmqContext)
+      toPostAuctionService_(proxy->zmqContext)
 {
 }
 
@@ -38,20 +38,25 @@ void
 AdServerConnector::
 init(shared_ptr<ConfigurationService> config)
 {
-    toPostAuctionService.init(config, ZMQ_XREQ);
-    toPostAuctionService.connectToServiceClass("rtbPostAuctionService",
-                                               "events");
+    shared_ptr<ServiceProxies> services = getServices();
+
+    registerServiceProvider(serviceName_, { "adServer" });
+    services->config->removePath(serviceName());
+
+    toPostAuctionService_.init(config, ZMQ_XREQ);
+    toPostAuctionService_.connectToServiceClass("rtbPostAuctionService",
+                                                "events");
 
 #if 0 // later, for when we have multiple
 
-    toPostAuctionServices.init(getServices()->config, name);
-    toPostAuctionServices.connectHandler = [=] (const string & connectedTo) {
+    toPostAuctionServices_.init(getServices()->config, name);
+    toPostAuctionServices_.connectHandler = [=] (const string & connectedTo) {
         cerr << "AdServerConnector is connected to post auction service "
         << connectedTo << endl;
     };
-    toPostAuctionServices.connectAllServiceProviders("rtbPostAuctionService",
-                                                     "agents");
-    toPostAuctionServices.connectToServiceClass();
+    toPostAuctionServices_.connectAllServiceProviders("rtbPostAuctionService",
+                                                      "agents");
+    toPostAuctionServices_.connectToServiceClass();
 #endif
 }
 
@@ -59,12 +64,22 @@ void
 AdServerConnector::
 start()
 {
+    startTime_ = Date::now();
+    recordHit("up");
 }
 
 void
 AdServerConnector::
 shutdown()
 {
+}
+
+void
+AdServerConnector::
+recordUptime()
+    const
+{
+    recordLevel(Date::now().secondsSince(startTime_), "uptime");
 }
 
 void
@@ -78,6 +93,9 @@ publishWin(const Id & auctionId,
            const AccountKey & account,
            Date bidTimestamp)
 {
+    recordHit("receivedEvent");
+    recordHit("event.WIN");
+
     PostAuctionEvent event;
     event.type = PAE_WIN;
     event.auctionId = auctionId;
@@ -90,7 +108,7 @@ publishWin(const Id & auctionId,
     event.bidTimestamp = bidTimestamp;
 
     string str = ML::DB::serializeToString(event);
-    toPostAuctionService.sendMessage("WIN", str);
+    toPostAuctionService_.sendMessage("WIN", str);
 }
 
 void
@@ -102,6 +120,9 @@ publishLoss(const Id & auctionId,
             const AccountKey & account,
             Date bidTimestamp)
 {
+    recordHit("receivedEvent");
+    recordHit("event.LOSS");
+
     PostAuctionEvent event;
     event.type = PAE_LOSS;
     event.auctionId = auctionId;
@@ -112,7 +133,7 @@ publishLoss(const Id & auctionId,
     event.bidTimestamp = bidTimestamp;
 
     string str = ML::DB::serializeToString(event);
-    toPostAuctionService.sendMessage("LOSS", str);
+    toPostAuctionService_.sendMessage("LOSS", str);
 }
 
 void
@@ -123,7 +144,10 @@ publishCampaignEvent(const string & label,
                      Date timestamp,
                      const JsonHolder & impressionMeta,
                      const UserIds & ids)
-{
+{ 
+    recordHit("receivedEvent");
+    recordHit("event." + label);
+
     PostAuctionEvent event;
     event.type = PAE_CAMPAIGN_EVENT;
     event.label = label;
@@ -134,7 +158,7 @@ publishCampaignEvent(const string & label,
     event.metadata = impressionMeta;
 
     string str = ML::DB::serializeToString(event);
-    toPostAuctionService.sendMessage("EVENT", str);
+    toPostAuctionService_.sendMessage("EVENT", str);
 }
 
 } // namespace RTBKIT

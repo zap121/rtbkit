@@ -17,41 +17,87 @@
 
 namespace RTBKIT {
 
+/****************************************************************************/
+/* HTTPADSERVERCONNECTIONHANDLER                                            */
+/****************************************************************************/
+
+class HttpAdServerHttpEndpoint;
+
+typedef boost::function<void (const HttpHeader & header,
+                              const Json::Value & json,
+                              const std::string & jsonStr)>
+    HttpAdServerRequestCb;
+
 struct HttpAdServerConnectionHandler
     : public Datacratic::JsonConnectionHandler {
-    HttpAdServerConnectionHandler(const AdServerRequestCb & requestCb);
+    HttpAdServerConnectionHandler(const HttpAdServerHttpEndpoint & endpoint,
+                                  const HttpAdServerRequestCb & requestCb);
 
     virtual void handleJson(const HttpHeader & header,
                             const Json::Value & json,
                             const std::string & jsonStr);
 
 private:
-    const AdServerRequestCb & requestCb_;
+    const HttpAdServerHttpEndpoint & endpoint_;
+    const HttpAdServerRequestCb & requestCb_;
 };
 
+
+/****************************************************************************/
+/* HTTPADSERVERHTTPENDPOINT                                                 */
+/****************************************************************************/
+
 struct HttpAdServerHttpEndpoint : public Datacratic::HttpEndpoint {
-    HttpAdServerHttpEndpoint(int port, const AdServerRequestCb & requestCb);
+    HttpAdServerHttpEndpoint(int port,
+                             const HttpAdServerRequestCb & requestCb);
     HttpAdServerHttpEndpoint(HttpAdServerHttpEndpoint && otherEndpoint);
 
     ~HttpAdServerHttpEndpoint();
 
-private:
-    virtual std::shared_ptr<ConnectionHandler> makeNewHandler();
+    int getPort() const;
 
+    /* carbon logging */
+    typedef boost::function<void (const char * eventName,
+                                  EventType,
+                                  float)> OnEvent;
+    OnEvent onEvent;
+
+    void doEvent(const char * eventName, EventType type = ET_COUNT,
+                 float value = 1.0, const char * units = "")
+      const
+    {
+        if (onEvent) {
+            std::string prefixedName(name() + "." + eventName);
+            onEvent(prefixedName.c_str(), type, value);
+        }
+    }
+
+    virtual std::shared_ptr<ConnectionHandler> makeNewHandler() const;
+
+private:
     int port_;
-    AdServerRequestCb requestCb_;
+    HttpAdServerRequestCb requestCb_;
 };
         
 /****************************************************************************/
-/* HTTP ADSERVER CONNECTOR                                                  */
+/* HTTPADSERVERCONNECTOR                                                    */
 /****************************************************************************/
 
 struct HttpAdServerConnector : public AdServerConnector {
-    HttpAdServerConnector(std::shared_ptr<Datacratic::ServiceProxies> & proxy,
-                          const std::string & serviceName
-                          = "AdServerConnector");
+    HttpAdServerConnector(const std::string & serviceName,
+                          std::shared_ptr<Datacratic::ServiceProxies> & proxy);
+    ~HttpAdServerConnector() {
+        shutdown();
+    }
 
-    void registerEndpoint(int port, const AdServerRequestCb & requestCb);
+    void registerEndpoint(int port, const HttpAdServerRequestCb & requestCb);
+
+    void init(const std::shared_ptr<ConfigurationService> & config);
+    void shutdown();
+
+    void bindTcp();
+
+    void start();
 
 private:
     std::vector<HttpAdServerHttpEndpoint> endpoints_;

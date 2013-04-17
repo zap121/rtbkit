@@ -20,25 +20,21 @@
 namespace RTBKIT {
 
 
-typedef boost::function<void (const Json::Value & json,
-                              const std::string & jsonStr)> AdServerRequestCb;
-
-
 /*****************************************************************************/
 /* ADSERVER CONNECTOR                                                        */
 /*****************************************************************************/
 
 struct AdServerConnector : public Datacratic::ServiceBase {
-    AdServerConnector(std::shared_ptr<Datacratic::ServiceProxies> & proxy,
-                      const std::string & serviceName);
-
+    AdServerConnector(const std::string & serviceName,
+                      std::shared_ptr<Datacratic::ServiceProxies> & proxy);
     virtual ~AdServerConnector();
 
     void init(std::shared_ptr<ConfigurationService> config);
+    virtual void shutdown();
 
     virtual void start();
 
-    virtual void shutdown();
+    void recordUptime() const;
 
     /*************************************************************************/
     /* METHODS TO SEND MESSAGES ON                                           */
@@ -55,9 +51,9 @@ struct AdServerConnector : public Datacratic::ServiceBase {
                     const AccountKey & account,
                     Date bidTimestamp);
 
-    /** Publish a LOSS into the router.  Thread safe and asynchronous.
-        Note that this method ONLY is useful for simulations; otherwise
-        losses are implicit.
+    /** Publish a LOSS into the post auction loop. Thread safe and
+        asynchronous. Note that this method ONLY is useful for simulations;
+        otherwise losses are implicit.
     */
     void publishLoss(const Id & auctionId,
                      const Id & adSpotId,
@@ -66,8 +62,8 @@ struct AdServerConnector : public Datacratic::ServiceBase {
                      const AccountKey & account,
                      Date bidTimestamp);
 
-    /** Publish an IMPRESSION into the router, to be passed on to the
-        agent that bid on it.
+    /** Publish a campaign event into the post auction loop, to be passed on
+        to the agent that bid on it.
         
         If the spot ID is empty, then the click will be sent to all
         agents that had a win on the auction.
@@ -80,13 +76,13 @@ struct AdServerConnector : public Datacratic::ServiceBase {
                               const UserIds & ids);
 
 private:
+    Date startTime_;
+
     // Connection to the post auction loops
-    ZmqNamedProxy toPostAuctionService;
+    ZmqNamedProxy toPostAuctionService_;
 
     // later... when we have multiple services
     //ZmqMultipleNamedClientBusProxy toPostAuctionServices;
 };
 
-
 } // namespace RTBKIT
-
