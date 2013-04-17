@@ -30,7 +30,7 @@ typedef boost::function<void (const HttpHeader & header,
 
 struct HttpAdServerConnectionHandler
     : public Datacratic::JsonConnectionHandler {
-    HttpAdServerConnectionHandler(const HttpAdServerHttpEndpoint & endpoint,
+    HttpAdServerConnectionHandler(HttpAdServerHttpEndpoint & endpoint,
                                   const HttpAdServerRequestCb & requestCb);
 
     virtual void handleJson(const HttpHeader & header,
@@ -38,7 +38,7 @@ struct HttpAdServerConnectionHandler
                             const std::string & jsonStr);
 
 private:
-    const HttpAdServerHttpEndpoint & endpoint_;
+    HttpAdServerHttpEndpoint & endpoint_;
     const HttpAdServerRequestCb & requestCb_;
 };
 
@@ -53,6 +53,9 @@ struct HttpAdServerHttpEndpoint : public Datacratic::HttpEndpoint {
     HttpAdServerHttpEndpoint(HttpAdServerHttpEndpoint && otherEndpoint);
 
     ~HttpAdServerHttpEndpoint();
+
+    HttpAdServerHttpEndpoint & operator =
+        (const HttpAdServerHttpEndpoint& other);
 
     int getPort() const;
 
@@ -72,7 +75,7 @@ struct HttpAdServerHttpEndpoint : public Datacratic::HttpEndpoint {
         }
     }
 
-    virtual std::shared_ptr<ConnectionHandler> makeNewHandler() const;
+    virtual std::shared_ptr<ConnectionHandler> makeNewHandler();
 
 private:
     int port_;
@@ -85,7 +88,8 @@ private:
 
 struct HttpAdServerConnector : public AdServerConnector {
     HttpAdServerConnector(const std::string & serviceName,
-                          std::shared_ptr<Datacratic::ServiceProxies> & proxy);
+                          const std::shared_ptr<Datacratic::ServiceProxies>
+                          & proxy);
     ~HttpAdServerConnector() {
         shutdown();
     }

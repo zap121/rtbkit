@@ -29,9 +29,8 @@ struct MockAdServerConnector : public HttpAdServerConnector
 {
     MockAdServerConnector(const std::string& serviceName,
                           std::shared_ptr<Datacratic::ServiceProxies> proxies)
-        :
-        HttpAdServerConnector(serviceName, proxies),
-        publisher(getServices()->zmqContext) {
+        : HttpAdServerConnector(serviceName, proxies),
+          publisher(getServices()->zmqContext) {
     }
 
     MockAdServerConnector(Datacratic::ServiceProxyArguments & args,
@@ -40,21 +39,15 @@ struct MockAdServerConnector : public HttpAdServerConnector
           publisher(getServices()->zmqContext) {
     }
 
-
     void init(int port) {
         auto services = getServices();
 
         // Prepare a simple JSON handler that already parsed the incoming HTTP payload so that it can
         // create the requied post auction object.
-        auto handleEvent = [=]() {
-            auto handler = [=](const Datacratic::HttpHeader & header,
+        auto handleEvent = [&](const Datacratic::HttpHeader & header,
                                const Json::Value & json,
-                               const std::string & text,
-                               Datacratic::AdHocJsonConnectionHandler * connection) {
-                this->handleEvent(PostAuctionEvent(json));
-            };
-
-            return std::make_shared<Datacratic::AdHocJsonConnectionHandler>(handler);
+                               const std::string & text) {
+            this->handleEvent(PostAuctionEvent(json));
         };
         registerEndpoint(port, handleEvent);
         
@@ -62,6 +55,8 @@ struct MockAdServerConnector : public HttpAdServerConnector
         // collision between different kind of service occurs.
         publisher.init(services->config, serviceName() + "/logger");
         publisher.bindTcp(services->ports->getRange("adServer/logger"));
+
+        HttpAdServerConnector::init(services->config);
     }
 
 
@@ -72,22 +67,21 @@ struct MockAdServerConnector : public HttpAdServerConnector
 
 
     void shutdown() {
-        exchange.shutdown();
-        proxy.shutdown();
         publisher.shutdown();
+        HttpAdServerConnector::shutdown();
     }
 
 
     void handleEvent(PostAuctionEvent const & event) {
         if(event.type == PAE_WIN) {
-            proxy.injectWin(event.auctionId,
-                            event.adSpotId,
-                            event.winPrice,
-                            event.timestamp,
-                            Json::Value(),
-                            event.uids,
-                            event.account,
-                            Date::now());
+            publishWin(event.auctionId,
+                       event.adSpotId,
+                       event.winPrice,
+                       event.timestamp,
+                       Json::Value(),
+                       event.uids,
+                       event.account,
+                       Date::now());
 
             Date now = Date::now();
             publisher.publish("WIN", now.print(3), event.auctionId.toString(), event.winPrice.toString(), "0");

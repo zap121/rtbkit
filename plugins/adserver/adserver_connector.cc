@@ -22,8 +22,8 @@ namespace RTBKIT {
 /*****************************************************************************/
 
 AdServerConnector::
-AdServerConnector(const std::string & serviceName,
-                  std::shared_ptr<Datacratic::ServiceProxies> & proxy)
+AdServerConnector(const string & serviceName,
+                  const shared_ptr<Datacratic::ServiceProxies> & proxy)
     : ServiceBase(serviceName, proxy),
       toPostAuctionService_(proxy->zmqContext)
 {

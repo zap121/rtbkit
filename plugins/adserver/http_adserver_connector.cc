@@ -12,7 +12,7 @@ using namespace RTBKIT;
 /****************************************************************************/
 
 HttpAdServerConnectionHandler::
-HttpAdServerConnectionHandler(const HttpAdServerHttpEndpoint & endpoint,
+HttpAdServerConnectionHandler(HttpAdServerHttpEndpoint & endpoint,
                               const HttpAdServerRequestCb & requestCb)
     : endpoint_(endpoint), requestCb_(requestCb)
 {
@@ -21,7 +21,7 @@ HttpAdServerConnectionHandler(const HttpAdServerHttpEndpoint & endpoint,
 void
 HttpAdServerConnectionHandler::
 handleJson(const HttpHeader & header, const Json::Value & json,
-           const std::string & jsonStr)
+           const string & jsonStr)
 {
     string resultMsg;
 
@@ -43,7 +43,7 @@ handleJson(const HttpHeader & header, const Json::Value & json,
                      "Content-Length: 0\r\n"
                      "\r\n");
     }
-    catch (const std::exception & exc) {
+    catch (const exception & exc) {
         cerr << "error parsing adserver request " << json << ": "
              << exc.what() << endl;
         endpoint_.doEvent("error.rqParsingError");
@@ -53,7 +53,7 @@ handleJson(const HttpHeader & header, const Json::Value & json,
         responseJson["message"] = json;
         responseJson["details"] = exc.what();
 
-        std::string response = responseJson.toString();
+        string response = responseJson.toString();
         resultMsg = ML::format("HTTP/1.1 400 Bad Request\r\n"
                                "Content-Type: text/json\r\n"
                                "Content-Length: %zd\r\n"
@@ -80,16 +80,28 @@ HttpAdServerHttpEndpoint(int port, const HttpAdServerRequestCb & requestCb)
 
 HttpAdServerHttpEndpoint::
 HttpAdServerHttpEndpoint(HttpAdServerHttpEndpoint && otherEndpoint)
-: HttpEndpoint("adserver-ep-" + std::to_string(otherEndpoint.port_))
+: HttpEndpoint("adserver-ep-" + to_string(otherEndpoint.port_))
 {
     port_ = otherEndpoint.port_;
-    requestCb_ = std::move(otherEndpoint.requestCb_);
+    requestCb_ = move(otherEndpoint.requestCb_);
 }
 
 HttpAdServerHttpEndpoint::
 ~HttpAdServerHttpEndpoint()
 {
     shutdown();
+}
+
+HttpAdServerHttpEndpoint &
+HttpAdServerHttpEndpoint::
+operator = (const HttpAdServerHttpEndpoint& other)
+{
+    if (this != &other) {
+        port_ = other.port_;
+        requestCb_ = other.requestCb_;
+    }
+
+    return *this;
 }
 
 int
@@ -103,7 +115,6 @@ getPort()
 shared_ptr<ConnectionHandler>
 HttpAdServerHttpEndpoint::
 makeNewHandler()
-    const
 {
     return std::make_shared<HttpAdServerConnectionHandler>(*this, requestCb_);
 }
@@ -115,7 +126,7 @@ makeNewHandler()
 
 HttpAdServerConnector::
 HttpAdServerConnector(const string & serviceName,
-                      shared_ptr<Datacratic::ServiceProxies> & proxy)
+                      const shared_ptr<Datacratic::ServiceProxies> & proxy)
     : AdServerConnector(serviceName, proxy)
 {
 }
@@ -129,8 +140,9 @@ registerEndpoint(int port, const HttpAdServerRequestCb & requestCb)
 
 void
 HttpAdServerConnector::
-init(const std::shared_ptr<ConfigurationService> & config)
+init(const shared_ptr<ConfigurationService> & config)
 {
+    AdServerConnector::init(config);
     for (HttpAdServerHttpEndpoint & endpoint: endpoints_) {
         auto onEvent = bind(&ServiceBase::recordEvent, this,
                             placeholders::_1, placeholders::_2,
@@ -146,6 +158,7 @@ shutdown()
     for (HttpAdServerHttpEndpoint & endpoint: endpoints_) {
         endpoint.shutdown();
     }
+    AdServerConnector::shutdown();
 }
 
 void

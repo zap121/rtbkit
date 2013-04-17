@@ -26,7 +26,7 @@ namespace RTBKIT {
 
 struct AdServerConnector : public Datacratic::ServiceBase {
     AdServerConnector(const std::string & serviceName,
-                      std::shared_ptr<Datacratic::ServiceProxies> & proxy);
+                      const std::shared_ptr<Datacratic::ServiceProxies> & proxy);
     virtual ~AdServerConnector();
 
     void init(std::shared_ptr<ConfigurationService> config);
