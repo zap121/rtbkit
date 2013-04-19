@@ -99,7 +99,8 @@ bool
 Creative::
 compatible(const AdSpot & adspot) const
 {
-    return adspot.formats.compatible(format);
+    return ((format.width == -1 && format.height == -1)
+            || adspot.formats.compatible(format));
 }
 
 bool
