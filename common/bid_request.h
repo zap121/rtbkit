@@ -91,6 +91,8 @@ struct FormatSet : public ML::compact_vector<Format, 3, uint16_t> {
 
     bool compatible(const Format & format) const
     {
+        if (format.width == -1 && format.length == -1)
+            return true;
         for (auto it = begin(), end = this->end();  it != end;  ++it)
             if (*it == format) return true;
         return false;
