@@ -5,6 +5,8 @@
    Auction endpoint class.
 */
 
+#include <sys/epoll.h>
+
 #include "http_exchange_connector.h"
 #include "http_auction_handler.h"
 #include "jml/arch/exception.h"
@@ -35,7 +37,11 @@ HttpExchangeConnector::
 HttpExchangeConnector(const std::string & name,
                       ServiceBase & parent)
     : ExchangeConnector(name, parent),
-      HttpEndpoint(name)
+      HttpEndpoint(name),
+      periodicTimer(1.0,
+                    [&] (uint64_t numWakeups) {
+                        this->periodicCallback(numWakeups);
+                    })
 {
     postConstructorInit();
 }
@@ -44,7 +50,11 @@ HttpExchangeConnector::
 HttpExchangeConnector(const std::string & name,
                       std::shared_ptr<ServiceProxies> proxies)
     : ExchangeConnector(name, proxies),
-      HttpEndpoint(name)
+      HttpEndpoint(name),
+      periodicTimer(1.0,
+                    [&] (uint64_t numWakeups) {
+                        this->periodicCallback(numWakeups);
+                    })
 {
     postConstructorInit();
 }
@@ -75,6 +85,20 @@ postConstructorInit()
         };
 
     handlerFactory = [=] () { return new HttpAuctionHandler(); };
+
+    /* periodic events */
+    addFd(periodicTimer.selectFd(), &periodicTimer);
+    parentHandler = Epoller::handleEvent;
+    Epoller::handleEvent = [&,parentHandler] (::epoll_event & event) {
+        if (event.data.ptr == (void *) &this->periodicTimer) {
+            return periodicTimer.processOne();
+        }
+        else if (parentHandler) {
+            return parentHandler(event);
+        }
+
+        return false;
+    };
 }
 
 HttpExchangeConnector::
@@ -272,13 +296,11 @@ getCampaignCompatibility(const AgentConfig & config,
         ::getCampaignCompatibility(config, includeReasons);
 }
 
-ExchangeConnector::ExchangeCompatibility
+void
 HttpExchangeConnector::
-getCreativeCompatibility(const Creative & creative,
-                         bool includeReasons) const
+periodicCallback(uint64_t numWakeups) const
 {
-    return ExchangeConnector
-        ::getCreativeCompatibility(creative, includeReasons);
+    recordLevel(numConnections(), "http-connections");
 }
 
 } // namespace RTBKIT
