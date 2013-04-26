@@ -231,7 +231,7 @@ makeBidRequest() -> BidRequest
     spot.formats = formats;
     bidRequest.imp.push_back(spot);
 
-    formats[0] = Format(300,250);
+    spot.formats[0] = Format(300,250);
     spot.id = Id(2);
     bidRequest.imp.push_back(spot);
 
@@ -355,7 +355,7 @@ MockExchange::Worker::isWin(const BidRequest&, const Bid& bid)
     if (rng.random01() >= 0.1)
         return make_pair(false, Amount());
 
-    return make_pair(true, MicroUSD(bid.maxPrice * rng.random01()));
+    return make_pair(true, MicroUSD_CPM(bid.maxPrice * rng.random01()));
 }
 
 
