@@ -208,6 +208,12 @@ struct HttpExchangeConnector
     virtual ExchangeCompatibility
     getCampaignCompatibility(const AgentConfig & config,
                              bool includeReasons) const;
+
+    /** Tell if a given creative is compatible with the given exchange.
+        See getCampaignCompatibility(). */
+    virtual ExchangeCompatibility
+    getCreativeCompatibility(const Creative & creative,
+                             bool includeReasons) const; 
     
     /** Method invoked every second for accounting */
     virtual void periodicCallback(uint64_t numWakeups) const;
