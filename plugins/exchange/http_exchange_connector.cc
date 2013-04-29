@@ -310,7 +310,7 @@ void
 HttpExchangeConnector::
 periodicCallback(uint64_t numWakeups) const
 {
-    recordLevel(numConnections(), "http-connections");
+    recordLevel(numConnections(), "httpConnections");
 }
 
 } // namespace RTBKIT
