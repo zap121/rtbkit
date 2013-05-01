@@ -39,6 +39,7 @@ struct JsonFeeder {
     void perform()
     {
         int sampleNum;
+        Easy client;
 
         for (sampleNum = 0; jsonStream && sampleNum < maxSamples;
              sampleNum++) {
@@ -49,8 +50,6 @@ struct JsonFeeder {
                 jsonStream = ML::filter_istream(filename);
                 getline(jsonStream, current);
             }
-
-            Easy client;
 
             /* perform request */
             client.setOpt(options::Url(serverUri));
