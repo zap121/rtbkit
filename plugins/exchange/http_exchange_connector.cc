@@ -296,16 +296,6 @@ getCampaignCompatibility(const AgentConfig & config,
         ::getCampaignCompatibility(config, includeReasons);
 }
 
-ExchangeConnector::ExchangeCompatibility
-HttpExchangeConnector::
-getCreativeCompatibility(const Creative & creative,
-                         bool includeReasons)
-    const
-{
-    return ExchangeConnector
-        ::getCreativeCompatibility(creative, includeReasons);
-}
-
 void
 HttpExchangeConnector::
 periodicCallback(uint64_t numWakeups) const
