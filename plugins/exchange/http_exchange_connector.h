@@ -70,7 +70,7 @@ struct HttpExchangeConnector
                        const std::string & auctionVerb = "POST",
                        int realTimePriority = -1);
 
-    /** Start the exchange connector running. */
+    /** Start the exchange connector running */
     virtual void start();
 
     /** Shutdown the exchange connector ready to be destroyed. */
