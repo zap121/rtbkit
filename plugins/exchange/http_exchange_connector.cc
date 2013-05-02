@@ -75,6 +75,10 @@ postConstructorInit()
         };
 
     handlerFactory = [=] () { return new HttpAuctionHandler(); };
+
+    addTimer(1.0,
+             [=] (uint64_t numWakeUps)
+             { this->periodicCallback(numWakeUps); });
 }
 
 HttpExchangeConnector::
@@ -279,6 +283,13 @@ getCreativeCompatibility(const Creative & creative,
 {
     return ExchangeConnector
         ::getCreativeCompatibility(creative, includeReasons);
+}
+
+void
+HttpExchangeConnector::
+periodicCallback(uint64_t numWakeups) const
+{
+    recordLevel(numConnections(), "httpConnections");
 }
 
 } // namespace RTBKIT
