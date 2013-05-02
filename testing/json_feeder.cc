@@ -63,6 +63,7 @@ struct JsonFeeder {
         int sampleNum;
         Easy client;
         struct timeval lastRequest;
+        Easy client;
 
         for (sampleNum = 0; jsonStream && sampleNum < nSamples;
              sampleNum++) {
