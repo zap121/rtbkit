@@ -62,6 +62,7 @@ struct HttpExchangeConnector
 
     /** Configure just the HTTP part of the server. */
     void configureHttp(int numThreads,
+                       int threadsRTPriority,
                        const PortRange & listenPort,
                        const std::string & bindHost = "*",
                        bool performNameLookup = false,
@@ -69,7 +70,7 @@ struct HttpExchangeConnector
                        const std::string & auctionResource = "/auctions",
                        const std::string & auctionVerb = "POST");
 
-    /** Start the exchange connector running */
+    /** Start the exchange connector running. */
     virtual void start();
 
     /** Shutdown the exchange connector ready to be destroyed. */
@@ -246,6 +247,7 @@ protected:
 
     /// Configuration parameters
     int numThreads;         
+    int threadsRTPriority;
     PortRange listenPort;
     std::string bindHost;
     bool performNameLookup;

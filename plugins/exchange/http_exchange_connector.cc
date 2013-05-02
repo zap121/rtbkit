@@ -54,6 +54,7 @@ HttpExchangeConnector::
 postConstructorInit()
 {
     numThreads = 8;
+    threadsRTPriority = -1;
     listenPort = 10001;
     bindHost = "*";
     performNameLookup = true;
@@ -88,6 +89,7 @@ HttpExchangeConnector::
 configure(const Json::Value & parameters)
 {
     getParam(parameters, numThreads, "numThreads");
+    getParam(parameters, threadsRTPriority, "threadsRTPriority");
     getParam(parameters, listenPort, "listenPort");
     getParam(parameters, bindHost, "bindHost");
     getParam(parameters, performNameLookup, "performNameLookup");
@@ -101,6 +103,7 @@ configure(const Json::Value & parameters)
 void
 HttpExchangeConnector::
 configureHttp(int numThreads,
+              int threadsRTPriority,
               const PortRange & listenPort,
               const std::string & bindHost,
               bool performNameLookup,
@@ -109,6 +112,7 @@ configureHttp(int numThreads,
               const std::string & auctionVerb)
 {
     this->numThreads = numThreads;
+    this->threadsRTPriority = threadsRTPriority;
     this->listenPort = listenPort;
     this->bindHost = bindHost;
     this->performNameLookup = performNameLookup;
@@ -123,6 +127,9 @@ start()
 {
     PassiveEndpoint::init(listenPort, bindHost, numThreads, true,
                           performNameLookup, backlog);
+    if (threadsRTPriority > -1) {
+        PassiveEndpoint::makeRealTime(threadsRTPriority);
+    }
 }
 
 void
