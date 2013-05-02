@@ -76,9 +76,9 @@ postConstructorInit()
 
     handlerFactory = [=] () { return new HttpAuctionHandler(); };
 
-    addTimer(1.0,
-             [=] (uint64_t numWakeUps)
-             { this->periodicCallback(numWakeUps); });
+    addPeriodic(1.0,
+                [=] (uint64_t numWakeUps)
+                { this->periodicCallback(numWakeUps); });
 }
 
 HttpExchangeConnector::
