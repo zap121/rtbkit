@@ -2241,6 +2241,7 @@ onAuctionDone(std::shared_ptr<Auction> auction)
     backtrace();
 #endif
 
+    recordHit("auctionSubmitted");
     debugAuction(auction->id, "SENT SUBMITTED");
     submittedBuffer.push(auction);
 }
