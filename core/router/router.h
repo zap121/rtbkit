@@ -17,6 +17,7 @@
 #include "soa/service/socket_per_thread.h"
 #include "soa/service/timeout_map.h"
 #include "soa/service/pending_list.h"
+#include "soa/service/loop_monitor.h"
 #include "augmentation_loop.h"
 #include "router_types.h"
 #include "soa/gc/gc_lock.h"
@@ -373,6 +374,9 @@ public:
 
     AugmentationLoop augmentationLoop;
     Blacklist blacklist;
+
+    LoopMonitor loopMonitor;
+    LoadStabilizer loadStabilizer;
 
     /** List of auctions we're currently tracking as active. */
     typedef TimeoutMap<Id, AuctionInfo> InFlight;
