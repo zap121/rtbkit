@@ -230,6 +230,14 @@ init()
     loopMonitor.addMessageLoop("monitorClient", &monitorClient);
     loopMonitor.addMessageLoop("monitorProviderClient", &monitorProviderClient);
 
+    loopMonitor.onLoadChange = [=] (double)
+        {
+            double keepProb = 1.0 - loadStabilizer.shedProbability();
+
+            setAcceptAuctionProbability(keepProb);
+            recordEvent("auctionKeepPercentage", ET_LEVEL, keepProb * 100.0);
+        };
+
     initialized = true;
 }
 
@@ -415,11 +423,13 @@ run()
     int totalSleeps = 0;
     double lastTimestamp = 0;
 
-    double totalSlept = 0;
-    loopMonitor.addCallback("routerLoop", [&] (double elapsed) {
-                double slept = totalSlept;
-                totalSlept = 0.0;
-                return 1.0 - (slept / elapsed);
+    double totalActive = 0;
+    double lastTotalActive = 0; // member variable for the lambda.
+    loopMonitor.addCallback("routerLoop",
+            [&, lastTotalActive] (double elapsed) mutable {
+                double delta = totalActive - lastTotalActive;
+                lastTotalActive = totalActive;
+                return delta / elapsed;
             });
 
     recordHit("routerUp");
@@ -452,6 +462,7 @@ run()
     while (!shutdown_) {
         beforeSleep = getTime();
 
+        totalActive += beforeSleep - afterSleep;
         dutyCycleCurrent.nsProcessing
             += microsecondsBetween(beforeSleep, afterSleep);
 
@@ -482,8 +493,6 @@ run()
         //cerr << "rc = " << rc << endl;
 
         afterSleep = getTime();
-
-        totalSlept += afterSleep - beforeSleep;
 
         dutyCycleCurrent.nsSleeping
             += microsecondsBetween(afterSleep, beforeSleep);
@@ -572,14 +581,7 @@ run()
             lastPings = now;
         }
 
-        if (now - last_check_pace > 1.0) {
-            double auctionKeepProbability =
-                1.0 - loadStabilizer.shedProbability();
-
-            setAcceptAuctionProbability(auctionKeepProbability);
-
-            recordEvent("auctionKeepPercentage", ET_LEVEL,
-                    auctionKeepProbability * 100.0);
+        if (now - last_check_pace > 10.0) {
             recordEvent("numTimesCouldSleep", ET_LEVEL,
                         numTimesCouldSleep);
 
@@ -655,6 +657,8 @@ void
 Router::
 shutdown()
 {
+    loopMonitor.shutdown();
+
     configListener.shutdown();
 
     shutdown_ = true;
