@@ -309,18 +309,13 @@ struct Router : public ServiceBase,
     */
     void setBudgetErrorRate(double val) { budgetErrorRate = val; }
 
-    /** Overwrite this function such that it causes the number of auctions
-        coming in to be throttled.
-    */
-    boost::function<void (double)> acceptAuctionProbabilityFn;
-
     /** Auction accept probability */
     void setAcceptAuctionProbability(double val)
     {
-        if (acceptAuctionProbabilityFn)
-            acceptAuctionProbabilityFn(val);
-        else if (val != 1.0)
-            std::cerr << "warning: no way to change accept auction probability" << std::endl;
+        Guard guard(lock);
+
+        for (auto& exchange : exchanges)
+            exchange->setAcceptBidRequestProbability(val);
     }
 
     /** Return service status. */
