@@ -61,7 +61,6 @@ struct JsonFeeder {
     void perform()
     {
         int sampleNum;
-        Easy client;
         struct timeval lastRequest;
         Easy client;
 
