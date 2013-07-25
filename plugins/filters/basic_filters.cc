@@ -143,6 +143,7 @@ private:
     {
         SegmentInfo include;
         SegmentInfo exclude;
+        ConfigSet emptyInclude;
         ConfigSet excludeIfNotPresent;
 
         void
@@ -150,7 +151,11 @@ private:
                 const AgentConfig::SegmentInfo& segments,
                 bool value)
         {
-            include.set(configIndex, segments.include, value);
+            if (include.empty())
+                emptyInclude.set(configIndex);
+            else
+                include.set(configIndex, segments.include, value);
+
             exclude.set(configIndex, segments.exclude, value);
 
             if (segments.excludeIfNotPresent)
@@ -161,7 +166,7 @@ private:
         // Double check with the segment filter test for all the edge cases.
         ConfigSet filter(const SegmentList& segments) const
         {
-            ConfigSet includes;
+            ConfigSet includes = emptyInclude;
 
             segments.forEach([&](int i, string str, float weights) {
                         includes |= include.get(i, str);
