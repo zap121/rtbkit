@@ -27,7 +27,7 @@ namespace RTBKIT {
 
 namespace {
 
-unordered_map<string, ConstructFn> filterRegister;
+unordered_map<string, FilterRegistry::ConstructFn> filterRegister;
 Spinlock filterRegisterLock;
 
 } // namespace anonymous
@@ -51,8 +51,8 @@ makeFilter(const string& name)
     {
         lock_guard<Spinlock> guard(filterRegisterLock);
 
-        auto it = data.find(name);
-        ExcCheck(it != data.end(), "Unknown filter: " + name);
+        auto it = filterRegister.find(name);
+        ExcCheck(it != filterRegister.end(), "Unknown filter: " + name);
         fn = it->second;
     }
 

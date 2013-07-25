@@ -4,10 +4,11 @@ LIBRTB_ROUTER_SOURCES := \
 	augmentation_loop.cc \
 	router.cc \
 	router_types.cc \
-	router_stack.cc
+	router_stack.cc \
+	filter_pool.cc
 
 LIBRTB_ROUTER_LINK := \
-	rtb zeromq boost_thread logger opstats crypto++ leveldb gc services redis banker agent_configuration monitor monitor_service post_auction
+	rtb zeromq boost_thread logger opstats crypto++ leveldb gc services redis banker agent_configuration monitor monitor_service post_auction filter_registry
 
 $(eval $(call library,rtb_router,$(LIBRTB_ROUTER_SOURCES),$(LIBRTB_ROUTER_LINK)))
 

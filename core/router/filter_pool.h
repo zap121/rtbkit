@@ -24,6 +24,7 @@ struct BidRequest;
 struct ExchangeConnector;
 struct AgentConfig;
 
+
 /******************************************************************************/
 /* FILTER POOL                                                                */
 /******************************************************************************/
@@ -54,11 +55,11 @@ private:
         Filters(const Filters& other, const std::string& toRemove);
         ~Filters();
 
-        ConfigSet activeConfigs
+        ConfigSet activeConfigs;
     };
 
     void addFilter(std::unique_ptr<FilterBase>& filter);
-    void setFilters(Filters* newFilters);
+    void setFilters(std::unique_ptr<Filters>& newFilters);
 
     std::atomic<Filters*> filters;
     std::vector< std::shared_ptr<AgentConfig> > configs;

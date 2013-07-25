@@ -10,7 +10,6 @@
 #include "rtbkit/common/bid_request.h"
 #include "rtbkit/common/exchange_connector.h"
 #include "rtbkit/core/agent_configuration/agent_config.h"
-#include "jml/utils/call_guard.h"
 #include "jml/utils/exc_check.h"
 
 
@@ -18,7 +17,7 @@ using namespace std;
 using namespace ML;
 
 
-namespace RTBKit {
+namespace RTBKIT {
 
 
 /******************************************************************************/
@@ -36,7 +35,7 @@ initWithDefaultFilters(FilterPool& pool)
 
 void
 FilterPool::
-setFilters(Filters* newFilters)
+setFilters(unique_ptr<Filters>& newFilters)
 {
     Filters* oldFilters = filters.exchange(newFilters.release());
     gc.defer([=] { delete oldFilters; });
@@ -46,8 +45,9 @@ setFilters(Filters* newFilters)
 FilterPool::
 ~FilterPool()
 {
-    setFilters(nullptr);
-    rcu.deferBarrier();
+    std::unique_ptr<Filters> nil;
+    setFilters(nil);
+    gc.deferBarrier();
 }
 
 
@@ -55,8 +55,7 @@ ConfigSet
 FilterPool::
 filter(const BidRequest& br, const ExchangeConnector* conn)
 {
-    rcu.lockShared();
-    Call_Guard guard([&] { rcu.unlockShared(); });
+    GcLockBase::SharedGuard guard(gc);
 
     Filters* current = filters.load();
     ConfigSet matching = current->activeConfigs;
@@ -90,7 +89,7 @@ addFilter(unique_ptr<FilterBase>& filter)
 
     for (size_t i = 0; i < configs.size(); ++i) {
         if (!configs[i]) continue;
-        filter->addConfig(i, configs[i]);
+        filter->addConfig(i, *configs[i]);
     }
 
     newFilters->push_back(filter.release());
@@ -113,9 +112,7 @@ removeFilter(const string& filterName)
     unique_ptr<Filters> newFilters(new Filters(*current, filterName));
     if (newFilters->size() == current->size()) return;
 
-    newFilters->push_back(filter);
     setFilters(newFilters);
-
 }
 
 
@@ -127,7 +124,7 @@ addConfig(shared_ptr<AgentConfig>& config)
     for (; index < configs.size(); ++index) {
         if (configs[index]) continue;
 
-        configs[i] = config;
+        configs[index] = config;
         break;
     }
 
@@ -135,10 +132,10 @@ addConfig(shared_ptr<AgentConfig>& config)
         configs.push_back(config);
 
     unique_ptr<Filters> newFilters(new Filters(*filters.load()));
-    newFilters->activeConfigs.set(configIndex);
+    newFilters->activeConfigs.set(index);
 
-    for (size_t i = 0; i < current->size(); ++i)
-        (*newFilters)[i]->addConfig(index, config);
+    for (size_t i = 0; i < newFilters->size(); ++i)
+        (*newFilters)[i]->addConfig(index, *config);
 
     setFilters(newFilters);
     return index;
@@ -147,7 +144,7 @@ addConfig(shared_ptr<AgentConfig>& config)
 
 void
 FilterPool::
-removeConfig(shared_ptr<AgentConfig> configs)
+removeConfig(shared_ptr<AgentConfig> config)
 {
     size_t index = 0;
     for (; index < configs.size(); ++index) {
@@ -162,16 +159,17 @@ void
 FilterPool::
 removeConfig(size_t configIndex)
 {
-    ExcCheckLess(index, configs.size(), "unknown config: " + configIndex);
+    ExcCheckLess(configIndex, configs.size(), "unknown config: " + configIndex);
     ExcCheck(configs[configIndex], "unknown config: " + configIndex);
 
+    auto config = configs[configIndex];
     configs[configIndex].reset();
 
     unique_ptr<Filters> newFilters(new Filters(*filters.load()));
     newFilters->activeConfigs.reset(configIndex);
 
-    for (size_t i = 0; i < newFitlers->size(); ++i)
-        (*newFilters)[i]->removeConfig(index, config);
+    for (size_t i = 0; i < newFilters->size(); ++i)
+        (*newFilters)[i]->removeConfig(configIndex, *config);
 
     setFilters(newFilters);
 }

@@ -6,8 +6,13 @@
 
 */
 
-#include "rtbkit/agent_configuration/agent_config.h"
+#include "rtbkit/core/agent_configuration/agent_config.h"
 #include "rtbkit/common/filter.h"
+
+#include <array>
+#include <unordered_map>
+#include <unordered_set>
+
 
 using namespace std;
 using namespace ML;
@@ -20,10 +25,10 @@ namespace {
 /* FILTER PRIORITY                                                            */
 /******************************************************************************/
 
-enum struct Priority : unsigned
+struct Priority
 {
-    HourOfWeek = 0x10000,
-    Segment    = 0x20000,
+    static constexpr unsigned HourOfWeek = 0x10000;
+    static constexpr unsigned Segment    = 0x20000;
 };
 
 
@@ -35,7 +40,7 @@ struct HourOfWeekFilter : public FilterBaseT<HourOfWeekFilter>
 {
     HourOfWeekFilter() { data.fill(ConfigSet()); }
 
-    static constexpr char* name = "hourOfWeek";
+    static constexpr const char* name = "hourOfWeek";
 
     unsigned priority() const { return Priority::HourOfWeek; }
 
@@ -58,17 +63,15 @@ struct HourOfWeekFilter : public FilterBaseT<HourOfWeekFilter>
         setConfig(configIndex, config, false);
     }
 
-    ConfigSet filter(const BidRequest& br, const ExchangeConnector*)
+    ConfigSet filter(const BidRequest& br, const ExchangeConnector*) const
     {
         ExcCheckNotEqual(br.timestamp, Date(), "Null auction date");
-        return return data[br.timestamp.hourOfWeek()];
+        return data[br.timestamp.hourOfWeek()];
     }
 
 private:
-    std::array<ConfigSet, 24 * 7> data;
+    array<ConfigSet, 24 * 7> data;
 };
-
-
 
 
 /******************************************************************************/
@@ -81,47 +84,51 @@ private:
  */
 struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
 {
-    SegmentsFilter() { data.fill(ConfigSet()); }
+    static constexpr const char* name = "segments";
 
-    static constexpr char* name = "segments";
-
-    unsigned priority() const { return Prioirty::Segment; }
+    unsigned priority() const { return Priority::Segment; }
 
     void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
     {
         for (const auto& segment : config.segments) {
             data[segment.first].set(configIndex, segment.second, value);
 
-            if (segment.excludeIfNotPresent)
+            if (segment.second.excludeIfNotPresent)
                 excludeIfNotPresent.insert(segment.first);
         }
     }
 
     void addConfig(unsigned configIndex, const AgentConfig& config)
     {
-        setConfig(configIndex, configIndex, true);
+        setConfig(configIndex, config, true);
     }
 
     void removeConfig(unsigned configIndex, const AgentConfig& config)
     {
-        setConfig(configIndex, configIndex, false);
+        setConfig(configIndex, config, false);
     }
 
-    ConfigSet filter(const BidRequest& br, const ExchangeConnector*)
+    ConfigSet filter(const BidRequest& br, const ExchangeConnector*) const
     {
         ConfigSet matches(true);
 
         unordered_set<string> toCheck = excludeIfNotPresent;
 
         for (const auto& segment : br.segments) {
-            matches &= data[segment.first].filter(*segment.second);
-            if (matches.empty()) return matches;
-
             toCheck.erase(segment.first);
+
+            auto it = data.find(segment.first);
+            if (it == data.end()) continue;
+
+            matches &= it->second.filter(*segment.second);
+            if (matches.empty()) return matches;
         }
 
         for(const auto& segment : toCheck) {
-            matches &= data[segment].excludeIfNotPresent.negate();
+            auto it = data.find(segment);
+            if (it == data.end()) continue;
+
+            matches &= it->second.excludeIfNotPresent.negate();
             if (matches.empty()) return matches;
         }
 
@@ -133,11 +140,11 @@ private:
 
     struct SegmentInfo
     {
-        std::unordered_map<int, ConfigSet> intSet;
-        std::unordered_map<string, ConfigSet> strSet;
+        unordered_map<int, ConfigSet> intSet;
+        unordered_map<string, ConfigSet> strSet;
 
         void
-        set(unsigned configIndex, const SegmentList& segments, bool value) const
+        set(unsigned configIndex, const SegmentList& segments, bool value)
         {
             segments.forEach([&](int i, string str, float weights) {
                         if (i < 0)
@@ -146,9 +153,16 @@ private:
                     });
         }
 
-        const ConfigSet& get(int i, string str) const
+        template<typename K>
+        ConfigSet get(const unordered_map<K, ConfigSet>& m, K k) const
         {
-            return i >= 0 ? intSet[i] : strSet[str];
+            auto it = m.find(k);
+            return it != m.end() ? it->second : ConfigSet();
+        }
+
+        ConfigSet get(int i, string str) const
+        {
+            return i >= 0 ? get(intSet, i) : get(strSet, str);
         }
     };
 
@@ -164,7 +178,7 @@ private:
                 const AgentConfig::SegmentInfo& segments,
                 bool value)
         {
-            if (include.empty())
+            if (segments.include.empty())
                 emptyInclude.set(configIndex);
             else
                 include.set(configIndex, segments.include, value);
@@ -186,7 +200,7 @@ private:
                     });
 
             segments.forEach([&](int i, string str, float weights) {
-                        includes &= excludes.get(i, str).negate();
+                        includes &= exclude.get(i, str).negate();
                     });
 
             return includes;
@@ -206,8 +220,8 @@ struct InitFilters
 {
     InitFilters()
     {
-        FilterRegistry::registerFilter<HourOfWeekFilter>(HourOfWeekFilter);
-        FilterRegistry::registerFilter<SegmentsFilter>(SegmentsFilter);
+        FilterRegistry::registerFilter<HourOfWeekFilter>();
+        FilterRegistry::registerFilter<SegmentsFilter>();
     }
 
 } initFilters;

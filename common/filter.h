@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "jml/arch/bitops.h"
 
 #include <vector>
 #include <string>
@@ -37,17 +38,17 @@ struct ConfigSet
     {}
 
 
-    void size() const
+    size_t size() const
     {
         return bitfield.size() * Div;
     }
 
-    void expand(size_t size)
+    void expand(size_t newSize)
     {
-        size_t newSize = (size - 1) / Div + 1;
+        newSize = (newSize - 1) / Div + 1; // ceilDiv(newSize Div)
         if (newSize <= size()) return;
 
-        bitfield.expand(newSize, defaultValue);
+        bitfield.resize(newSize, defaultValue);
     }
 
 
@@ -80,7 +81,7 @@ struct ConfigSet
 
         for (size_t i = 0; i < size(); ++i) {
             if (!bitfield[i]) continue;
-            total += num_bits_set(bitfield[i]);
+            total += ML::num_bits_set(bitfield[i]);
         }
 
         return total;
@@ -137,7 +138,7 @@ struct ConfigSet
     ConfigSet& negate()
     {
         for (size_t i = 0; i < size(); ++i)
-            bitfield[i] ~= bitfield[i];
+            bitfield[i] = ~bitfield[i];
         return *this;
     }
 
@@ -229,7 +230,7 @@ struct FilterBaseT : public FilterBase
 
     FilterBase* clone() const
     {
-        return new Filter(*static_cast<Filter*>(this));
+        return new Filter(*static_cast<const Filter*>(this));
     }
 };
 
@@ -245,13 +246,13 @@ struct FilterRegistry
     template<typename Filter>
     static void registerFilter()
     {
-        registerFilter(Filter::name, [] -> FilterBase* { return new Filter(); });
+        registerFilter(Filter::name, [] () -> FilterBase* { return new Filter(); });
     }
 
     static void registerFilter(const std::string& name, ConstructFn fn);
     static FilterBase* makeFilter(const std::string& name);
 
-    static std::vector<string> listFilters();
+    static std::vector<std::string> listFilters();
 };
 
 
