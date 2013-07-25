@@ -179,21 +179,17 @@ private:
 /* FILTER BASE                                                                */
 /******************************************************************************/
 
-template<typename Filter>
 struct FilterBase
 {
     /**
 
      */
-    std::string name() const { return Filter::name; }
+    virtual std::string name() const = 0;
 
     /**
 
      */
-    FilterBase* clone() const
-    {
-        return new Filter(*static_cast<Filter*>(this));
-    }
+    virtual FilterBase* clone() const = 0;
 
     /** Filters the given bid request such and a return the set of agent
         configuration that matches the given bid request.
@@ -218,6 +214,18 @@ struct FilterBase
      */
     virtual unsigned priority() const { return 0; }
 
+};
+
+
+template<typename Filter>
+struct FilterBaseT : public FilterBase
+{
+    std::string name() const { return Filter::name; }
+
+    FilterBase* clone() const
+    {
+        return new Filter(*static_cast<Filter*>(this));
+    }
 };
 
 

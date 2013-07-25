@@ -31,13 +31,13 @@ enum struct Priority : unsigned
 /* HOUR OF WEEK FILTER                                                        */
 /******************************************************************************/
 
-struct HourOfWeekFilter : public FilterBase<HourOfWeekFilter>
+struct HourOfWeekFilter : public FilterBaseT<HourOfWeekFilter>
 {
     HourOfWeekFilter() { data.fill(ConfigSet()); }
 
     static constexpr char* name = "hourOfWeek";
 
-    unsigned priority() const { return Prioirty::HourOfWeek; }
+    unsigned priority() const { return Priority::HourOfWeek; }
 
     void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
     {
@@ -79,7 +79,7 @@ private:
 /** \todo weights and exchanges.
 
  */
-struct SegmentsFilter : public FilterBase<SegmentsFilter>
+struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
 {
     SegmentsFilter() { data.fill(ConfigSet()); }
 
