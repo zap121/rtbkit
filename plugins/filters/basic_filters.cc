@@ -89,8 +89,12 @@ struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
 
     void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
     {
-        for (const auto& segment : config.segments)
+        for (const auto& segment : config.segments) {
             data[segment.first].set(configIndex, segment.second, value);
+
+            if (segment.excludeIfNotPresent)
+                excludeIfNotPresent.insert(segment.first);
+        }
     }
 
     void addConfig(unsigned configIndex, const AgentConfig& config)
@@ -107,8 +111,17 @@ struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
     {
         ConfigSet matches(true);
 
+        unordered_set<string> toCheck = excludeIfNotPresent;
+
         for (const auto& segment : br.segments) {
             matches &= data[segment.first].filter(*segment.second);
+            if (matches.empty()) return matches;
+
+            toCheck.erase(segment.first);
+        }
+
+        for(const auto& segment : toCheck) {
+            matches &= data[segment].excludeIfNotPresent.negate();
             if (matches.empty()) return matches;
         }
 
@@ -181,9 +194,13 @@ private:
     };
 
     unordered_map<string, SegmentFilter> data;
+    unordered_set<string> excludeIfNotPresent;
 };
 
 
+/******************************************************************************/
+/* INIT FILTERS                                                               */
+/******************************************************************************/
 
 struct InitFilters
 {

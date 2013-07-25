@@ -141,6 +141,11 @@ struct ConfigSet
         return *this;
     }
 
+    ConfigSet negate() const
+    {
+        return ConfigSet(*this).negate();
+    }
+
 
     /** Usage example:
 
