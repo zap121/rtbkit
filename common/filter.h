@@ -98,24 +98,39 @@ struct ConfigSet
     ConfigSet& operator &= (const ConfigSet& other)
     {
         expand(other.size());
-        for (size_t i = 0; i < bitfield.size(); ++i)
+
+        for (size_t i = 0; i < other.size(); ++i)
             bitfield[i] &= other.bitfield[i];
+
+        for (size_t i = other.size(); i < bitfield.size(); ++i)
+            bitfield[i] &= other.defaultValue;
+
         return *this;
     }
 
     ConfigSet& operator |= (const ConfigSet& other)
     {
         expand(other.size());
-        for (size_t i = 0; i < size; ++i)
+
+        for (size_t i = 0; i < other.size(); ++i)
             bitfield[i] |= other.bitfield[i];
+
+        for (size_t i = other.size(); i < bitfield.size(); ++i)
+            bitfield[i] |= other.defaultValue;
+
         return *this;
     }
 
     ConfigSet& operator ^= (const ConfigSet& other)
     {
         expand(other.size());
-        for (size_t i = 0; i < size; ++i)
+
+        for (size_t i = 0; i < other.size(); ++i)
             bitfield[i] ^= other.bitfield[i];
+
+        for (size_t i = other.size(); i < bitfield.size(); ++i)
+            bitfield[i] ^= other.defaultValue;
+
         return *this;
     }
 
