@@ -6,222 +6,122 @@
 
 */
 
-#include "rtbkit/core/agent_configuration/agent_config.h"
-#include "rtbkit/common/filter.h"
-
-#include <array>
-#include <unordered_map>
-#include <unordered_set>
+#include "basic_filters.h"
 
 
 using namespace std;
 using namespace ML;
-using namespace RTBKIT;
 
-namespace {
-
-
-/******************************************************************************/
-/* FILTER PRIORITY                                                            */
-/******************************************************************************/
-
-struct Priority
-{
-    static constexpr unsigned HourOfWeek = 0x10000;
-    static constexpr unsigned Segment    = 0x20000;
-};
-
-
-/******************************************************************************/
-/* HOUR OF WEEK FILTER                                                        */
-/******************************************************************************/
-
-struct HourOfWeekFilter : public FilterBaseT<HourOfWeekFilter>
-{
-    HourOfWeekFilter() { data.fill(ConfigSet()); }
-
-    static constexpr const char* name = "hourOfWeek";
-
-    unsigned priority() const { return Priority::HourOfWeek; }
-
-    void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
-    {
-        const auto& bitmap = config.hourOfWeekFilter.hourBitmap;
-        for (size_t i = 0; i < bitmap.size(); ++i) {
-            if (!bitmap[i]) continue;
-            data[i].set(configIndex, value);
-        }
-    }
-
-    void addConfig(unsigned configIndex, const AgentConfig& config)
-    {
-        setConfig(configIndex, config, true);
-    }
-
-    void removeConfig(unsigned configIndex, const AgentConfig& config)
-    {
-        setConfig(configIndex, config, false);
-    }
-
-    ConfigSet filter(const BidRequest& br, const ExchangeConnector*) const
-    {
-        ExcCheckNotEqual(br.timestamp, Date(), "Null auction date");
-        return data[br.timestamp.hourOfWeek()];
-    }
-
-private:
-    array<ConfigSet, 24 * 7> data;
-};
-
+namespace RTBKIT {
 
 /******************************************************************************/
 /* SEGMENT FILTER                                                             */
 /******************************************************************************/
 
-
-/** \todo weights and exchanges.
-
- */
-struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
+void
+SegmentsFilter::
+setConfig(unsigned configIndex, const AgentConfig& config, bool value)
 {
-    static constexpr const char* name = "segments";
+    for (const auto& segment : config.segments) {
+        data[segment.first].set(configIndex, segment.second, value);
 
-    unsigned priority() const { return Priority::Segment; }
+        if (segment.second.excludeIfNotPresent)
+            excludeIfNotPresent.insert(segment.first);
+    }
+}
 
-    void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
-    {
-        for (const auto& segment : config.segments) {
-            data[segment.first].set(configIndex, segment.second, value);
+ConfigSet
+SegmentsFilter::
+filter(const BidRequest& br, const ExchangeConnector*) const
+{
+    ConfigSet matches(true);
 
-            if (segment.second.excludeIfNotPresent)
-                excludeIfNotPresent.insert(segment.first);
-        }
+    unordered_set<string> toCheck = excludeIfNotPresent;
+
+    for (const auto& segment : br.segments) {
+        toCheck.erase(segment.first);
+
+        auto it = data.find(segment.first);
+        if (it == data.end()) continue;
+
+        matches &= it->second.filter(*segment.second);
+        if (matches.empty()) return matches;
     }
 
-    void addConfig(unsigned configIndex, const AgentConfig& config)
-    {
-        setConfig(configIndex, config, true);
+    for(const auto& segment : toCheck) {
+        auto it = data.find(segment);
+        if (it == data.end()) continue;
+
+        matches &= it->second.excludeIfNotPresent.negate();
+        if (matches.empty()) return matches;
     }
 
-    void removeConfig(unsigned configIndex, const AgentConfig& config)
-    {
-        setConfig(configIndex, config, false);
-    }
-
-    ConfigSet filter(const BidRequest& br, const ExchangeConnector*) const
-    {
-        ConfigSet matches(true);
-
-        unordered_set<string> toCheck = excludeIfNotPresent;
-
-        for (const auto& segment : br.segments) {
-            toCheck.erase(segment.first);
-
-            auto it = data.find(segment.first);
-            if (it == data.end()) continue;
-
-            matches &= it->second.filter(*segment.second);
-            if (matches.empty()) return matches;
-        }
-
-        for(const auto& segment : toCheck) {
-            auto it = data.find(segment);
-            if (it == data.end()) continue;
-
-            matches &= it->second.excludeIfNotPresent.negate();
-            if (matches.empty()) return matches;
-        }
-
-        return matches;
-    }
+    return matches;
+}
 
 
-private:
+void
+SegmentsFilter::SegmentInfo::
+set(unsigned configIndex, const SegmentList& segments, bool value)
+{
+    segments.forEach([&](int i, string str, float weights) {
+                if (i < 0)
+                    intSet[i].set(configIndex, value);
+                else strSet[str].set(configIndex, value);
+            });
+}
 
-    struct SegmentInfo
-    {
-        unordered_map<int, ConfigSet> intSet;
-        unordered_map<string, ConfigSet> strSet;
+void
+SegmentsFilter::SegmentFilter::
+set(    unsigned configIndex,
+        const AgentConfig::SegmentInfo& segments,
+        bool value)
+{
+    if (segments.include.empty())
+        emptyInclude.set(configIndex);
+    else
+        include.set(configIndex, segments.include, value);
 
-        void
-        set(unsigned configIndex, const SegmentList& segments, bool value)
-        {
-            segments.forEach([&](int i, string str, float weights) {
-                        if (i < 0)
-                            intSet[i].set(configIndex, value);
-                        else strSet[str].set(configIndex, value);
-                    });
-        }
+    exclude.set(configIndex, segments.exclude, value);
 
-        template<typename K>
-        ConfigSet get(const unordered_map<K, ConfigSet>& m, K k) const
-        {
-            auto it = m.find(k);
-            return it != m.end() ? it->second : ConfigSet();
-        }
+    if (segments.excludeIfNotPresent)
+        excludeIfNotPresent.set(configIndex, value);
+}
 
-        ConfigSet get(int i, string str) const
-        {
-            return i >= 0 ? get(intSet, i) : get(strSet, str);
-        }
-    };
+// \todo This is not quite right but will do for now.
+// Double check with the segment filter test for all the edge cases.
+ConfigSet
+SegmentsFilter::SegmentFilter::
+filter(const SegmentList& segments) const
+{
+    ConfigSet includes = emptyInclude;
 
-    struct SegmentFilter
-    {
-        SegmentInfo include;
-        SegmentInfo exclude;
-        ConfigSet emptyInclude;
-        ConfigSet excludeIfNotPresent;
+    segments.forEach([&](int i, string str, float weights) {
+                includes |= include.get(i, str);
+            });
 
-        void
-        set(    unsigned configIndex,
-                const AgentConfig::SegmentInfo& segments,
-                bool value)
-        {
-            if (segments.include.empty())
-                emptyInclude.set(configIndex);
-            else
-                include.set(configIndex, segments.include, value);
+    segments.forEach([&](int i, string str, float weights) {
+                includes &= exclude.get(i, str).negate();
+            });
 
-            exclude.set(configIndex, segments.exclude, value);
+    return includes;
+}
 
-            if (segments.excludeIfNotPresent)
-                excludeIfNotPresent.set(configIndex, value);
-        }
-
-        // \todo This is not quite right but will do for now.
-        // Double check with the segment filter test for all the edge cases.
-        ConfigSet filter(const SegmentList& segments) const
-        {
-            ConfigSet includes = emptyInclude;
-
-            segments.forEach([&](int i, string str, float weights) {
-                        includes |= include.get(i, str);
-                    });
-
-            segments.forEach([&](int i, string str, float weights) {
-                        includes &= exclude.get(i, str).negate();
-                    });
-
-            return includes;
-        }
-    };
-
-    unordered_map<string, SegmentFilter> data;
-    unordered_set<string> excludeIfNotPresent;
-};
+} // namespace RTBKIT
 
 
 /******************************************************************************/
 /* INIT FILTERS                                                               */
 /******************************************************************************/
 
+namespace {
+
 struct InitFilters
 {
     InitFilters()
     {
-        FilterRegistry::registerFilter<HourOfWeekFilter>();
-        FilterRegistry::registerFilter<SegmentsFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::HourOfWeekFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::SegmentsFilter>();
     }
 
 } initFilters;
