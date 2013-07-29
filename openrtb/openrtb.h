@@ -30,6 +30,7 @@
 #include "soa/types/url.h"
 #include "jml/utils/compact_vector.h"
 #include "soa/jsoncpp/value.h"
+#include "soa/types/basic_value_descriptions.h"
 #include <iostream>
 
 namespace OpenRTB {
@@ -37,166 +38,9 @@ namespace OpenRTB {
 using std::string;
 using std::vector;
 using std::unique_ptr;
-using Datacratic::Id;
-using Datacratic::Utf8String;
-using Datacratic::Url;
+using namespace Datacratic;
 
 typedef std::string CSList;  // comma-separated list
-
-template<typename T>
-struct Optional: public std::unique_ptr<T> {
-    Optional()
-    {
-    }
-    
-    Optional(Optional && other)
-        : std::unique_ptr<T>(std::move(other))
-    {
-    }
-
-    Optional(const Optional & other)
-    {
-        if (other)
-            this->reset(new T(*other));
-    }
-
-    Optional & operator = (const Optional & other)
-    {
-        Optional newMe(other);
-        swap(newMe);
-        return *this;
-    }
-
-    Optional & operator = (Optional && other)
-    {
-        Optional newMe(other);
-        swap(newMe);
-        return *this;
-    }
-
-    void swap(Optional & other)
-    {
-        std::unique_ptr<T>::swap(other);
-    }
-};
-
-template<typename Cls, int defValue = -1>
-struct TaggedEnum {
-    TaggedEnum()
-        : val(-1)
-    {
-    }
-
-    int val;
-
-    int value() const
-    {
-        return val;
-    }
-
-
-#if 0
-    operator typename Cls::Vals () const
-    {
-        return static_cast<typename Cls::Vals>(val);
-    }
-#endif
-};
-
-template<typename E, int def>
-bool operator == (const TaggedEnum<E, def> & e1, const TaggedEnum<E, def> & e2)
-{
-    return e1.val == e2.val;
-}
-
-template<typename E, int def>
-bool operator != (const TaggedEnum<E, def> & e1, const TaggedEnum<E, def> & e2)
-{
-    return e1.val != e2.val;
-}
-
-template<typename E, int def>
-bool operator > (const TaggedEnum<E, def> & e1, const TaggedEnum<E, def> & e2)
-{
-    return e1.val > e2.val;
-}
-
-template<typename E, int def>
-bool operator < (const TaggedEnum<E, def> & e1, const TaggedEnum<E, def> & e2)
-{
-    return e1.val < e2.val;
-}
-
-template<typename E, int def>
-inline Json::Value jsonPrint(const TaggedEnum<E, def> & e)
-{
-    return e.val;
-}
-
-template<typename E, int def>
-inline void jsonParse(const Json::Value & j, TaggedEnum<E, def> & e)
-{
-    e.val = j.asInt();
-}
-
-struct TaggedBool {
-    TaggedBool()
-        : val(-1)
-    {
-    }
-
-    int val;
-};
-
-template<int defValue = -1>
-struct TaggedBoolDef : public TaggedBool {
-    TaggedBoolDef()
-        : val(defValue)
-    {
-    }
-
-    int val;
-};
-
-struct TaggedInt {
-    TaggedInt()
-        : val(-1)
-    {
-    }
-
-    int value() const { return val; }
-
-    int val;
-};
-
-template<int defValue = -1>
-struct TaggedIntDef : TaggedInt {
-    TaggedIntDef()
-        : val(defValue)
-    {
-    }
-
-    int val;
-};
-
-struct TaggedFloat {
-    TaggedFloat()
-        : val(std::numeric_limits<float>::quiet_NaN())
-    {
-    }
-
-    float val;
-};
-
-template<int num = -1, int den = 1>
-struct TaggedFloatDef : public TaggedFloat {
-    TaggedFloatDef()
-        : val(1.0f * num / den)
-    {
-    }
-
-    float val;
-};
 
 #if 0 // c++11 templated typedefs
 template<typename T>
@@ -1051,7 +895,7 @@ struct Geo {
 struct Device {
     ~Device();
     TaggedBool dnt;        ///< If 1 then do not track is on
-    Utf8String ua;             ///< User agent of device
+    Utf8String ua;         ///< User agent of device
     string ip;             ///< IP address of device
     Optional<Geo> geo;     ///< Geolocation of device
     string didsha1;        ///< Device ID: SHA1
@@ -1059,8 +903,8 @@ struct Device {
     string dpidsha1;       ///< Device Platform ID: SHA1
     string dpidmd5;        ///< Device Platform ID: MD5
     string ipv6;           ///< IPv6 address
-    Utf8String carrier;        ///< Carrier or ISP (derived from IP address)
-    Utf8String language;       ///< Browser language.  ISO 639-1 (alpha-2).
+    Utf8String carrier;    ///< Carrier or ISP (derived from IP address)
+    Utf8String language;   ///< Browser language.  ISO 639-1 (alpha-2).
     string make;           ///< Device make
     string model;          ///< Device model
     string os;             ///< Device OS

@@ -323,7 +323,19 @@ initConnections()
     // Initialize zeromq endpoints
     endpoint.init(getServices()->config, ZMQ_XREP, serviceName() + "/events");
     toAgents.init(getServices()->config, serviceName() + "/agents");
+
     configListener.init(getServices()->config);
+    configListener.onConfigChange = [=](const std::string & agent,
+                                        std::shared_ptr<const AgentConfig> config) {
+        if(config->account.empty())
+            throw ML::Exception("attempt to add an account with empty values");
+
+        banker->addSpendAccount(config->account, Amount(), [=](std::exception_ptr error,
+                                                               ShadowAccount && acount) {
+            if(error) logException(error, "Banker addSpendAccount");
+        });
+    };
+
     endpoint.messageHandler
         = std::bind(&ZmqMessageRouter::handleMessage,
                     &router,
@@ -485,9 +497,10 @@ doAuctionMessage(const std::vector<std::string> & message)
     recordHit("messages.AUCTION");
     //cerr << "doAuctionMessage " << message << endl;
 
-    SubmittedAuctionEvent event
-        = ML::DB::reconstituteFromString<SubmittedAuctionEvent>(message.at(2));
-    doAuction(event);
+    auto event = Message<SubmittedAuctionEvent>::fromString(message.at(2));
+    if(event) { 
+        doAuction(event.payload);
+    }
 }
 
 void

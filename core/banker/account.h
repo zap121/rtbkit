@@ -203,8 +203,6 @@ public:
         return (recycledIn - recycledOut).nonNegative();
     }
 
-    CurrencyPool getBudget() const;
-
     /** Returns the budget what was not transferred from or to other accounts.
      */
 
@@ -666,14 +664,7 @@ struct ShadowAccount {
         masterAccount.checkInvariants();
 
         // net budget: balance assuming spent, commitments are zero
-        netBudget = (masterAccount.budgetIncreases
-                     - masterAccount.budgetDecreases
-                     + masterAccount.recycledIn
-                     - masterAccount.recycledOut
-                     + masterAccount.adjustmentsIn
-                     - masterAccount.adjustmentsOut
-                     + masterAccount.allocatedIn
-                     - masterAccount.allocatedOut);
+        netBudget = masterAccount.getNetBudget();
         commitmentsMade += masterAccount.commitmentsMade;
         commitmentsRetired += masterAccount.commitmentsRetired;
         spent += masterAccount.spent;
@@ -706,6 +697,7 @@ struct AccountSummary {
     CurrencyPool spent;          ///< Sum of sub-account spend
     CurrencyPool adjustments;    ///< Sum of sub-account adjustments
     CurrencyPool adjustedSpent;  ///< Spend minus adjustments
+    CurrencyPool effectiveBudget;  ///< budget computed internally
     CurrencyPool available;      ///< Total amount we're allowed to spend
 
     Account account;
@@ -716,6 +708,7 @@ struct AccountSummary {
     {
         if (addInSubaccounts)
             subAccounts[name] = child;
+        effectiveBudget += child.effectiveBudget;
         inFlight += child.inFlight;
         spent += child.spent;
         adjustments += child.adjustments;
@@ -744,6 +737,7 @@ struct AccountSummary {
             = simplified ? "AccountSimpleSummary" : "AccountSummary";
         result["md"]["version"] = 1;
         result["budget"] = budget.toJson();
+        result["effectiveBudget"] = effectiveBudget.toJson();
         result["spent"] = spent.toJson();
         result["adjustments"] = adjustments.toJson();
         result["adjustedSpent"] = adjustedSpent.toJson();
@@ -767,6 +761,7 @@ struct AccountSummary {
         ExcAssertEqual(val["md"]["version"].asInt(), 1);
 
         result.budget = CurrencyPool::fromJson(val["budget"]);
+        result.effectiveBudget = CurrencyPool::fromJson(val["effectiveBudget"]);
         result.inFlight = CurrencyPool::fromJson(val["inFlight"]);
         result.spent = CurrencyPool::fromJson(val["spent"]);
         result.adjustments = CurrencyPool::fromJson(val["adjustments"]);
@@ -1241,7 +1236,10 @@ private:
 
         result.account = a;
         result.spent = a.spent;
-        result.budget = a.getBudget();
+        result.budget = a.budgetIncreases - a.budgetDecreases;
+        result.effectiveBudget = a.budgetIncreases - a.budgetDecreases 
+                        + a.recycledIn - a.recycledOut
+                        + a.allocatedIn - a.allocatedOut;
         result.inFlight = a.commitmentsMade - a.commitmentsRetired;
         result.adjustments = a.adjustmentsIn - a.adjustmentsOut;
 
@@ -1252,10 +1250,10 @@ private:
                             maxDepth == -1 || depth < maxDepth);
         };
         forEachChildAccount(account, doChildAccount);
-
-        result.available = (result.budget + result.adjustments
-                            - result.spent - result.inFlight);
+        
         result.adjustedSpent = result.spent - result.adjustments;
+
+        result.available = (result.effectiveBudget - result.adjustedSpent - result.inFlight);
         
         return result;
     }
