@@ -33,35 +33,51 @@ struct FilterPool
 {
     ~FilterPool();
 
-    ConfigSet filter(const BidRequest& br, const ExchangeConnector* conn);
+    typedef std::vector< std::shared_ptr<AgentConfig> > ConfigList;
+    ConfigList filter(const BidRequest& br, const ExchangeConnector* conn);
+
 
     // \todo Need batch interfaces of these to alleviate overhead.
-    void addFilter(const std::string& toAdd);
-    void removeFilter(const std::string& toRemove);
+    void addFilter(const std::string& name);
+    void removeFilter(const std::string& name);
 
     // \todo Need batch interfaces to alleviate overhead.
-    size_t addConfig(std::shared_ptr<AgentConfig>& config);
-    void removeConfig(std::shared_ptr<AgentConfig> configs);
-    void removeConfig(size_t configIndex);
+    void addConfig(
+            const std::string& name, const std::shared_ptr<AgentConfig>& config);
+    void removeConfig(const std::string& name);
 
-    // Temporary until we can get a fully dynamic system going.
     static void initWithDefaultFilters(FilterPool& pool);
 
 private:
 
-    struct Filters : public std::vector<FilterBase*>
+    struct Data
     {
-        Filters(const Filters& other);
-        Filters(const Filters& other, const std::string& toRemove);
-        ~Filters();
+        Data() {}
+        Data(const Data& other);
+        ~Data();
+
+        ssize_t findConfig(const std::string& name) const;
+        void addConfig(
+                const std::string& name,
+                const std::shared_ptr<AgentConfig>& config);
+        void removeConfig(const std::string& name);
+
+        ssize_t findFilter(const std::string& name) const;
+        void addFilter(FilterBase* filter);
+        void removeFilter(const std::string& name);
+
+        // \todo Use unique_ptr when moving to gcc 4.7
+        std::vector<FilterBase*> filters;
+
+        typedef std::pair<std::string, std::shared_ptr<AgentConfig> > ConfigEntry;
+        std::vector<ConfigEntry> configs;
 
         ConfigSet activeConfigs;
     };
 
-    void addFilter(std::unique_ptr<FilterBase>& filter);
-    void setFilters(std::unique_ptr<Filters>& newFilters);
+    bool setData(Data*&, std::unique_ptr<Data>&);
 
-    std::atomic<Filters*> filters;
+    std::atomic<Data*> data;
     std::vector< std::shared_ptr<AgentConfig> > configs;
     Datacratic::GcLock gc;
 };

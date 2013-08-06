@@ -53,14 +53,16 @@ struct HourOfWeekFilter : public FilterBaseT<HourOfWeekFilter>
         }
     }
 
-    void addConfig(unsigned configIndex, const AgentConfig& config)
+    void addConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
     {
-        setConfig(configIndex, config, true);
+        setConfig(configIndex, *config, true);
     }
 
-    void removeConfig(unsigned configIndex, const AgentConfig& config)
+    void removeConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
     {
-        setConfig(configIndex, config, false);
+        setConfig(configIndex, *config, false);
     }
 
     ConfigSet filter(const BidRequest& br, const ExchangeConnector*) const
@@ -88,14 +90,16 @@ struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
     unsigned priority() const { return Priority::Segment; }
 
 
-    void addConfig(unsigned configIndex, const AgentConfig& config)
+    void addConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
     {
-        setConfig(configIndex, config, true);
+        setConfig(configIndex, *config, true);
     }
 
-    void removeConfig(unsigned configIndex, const AgentConfig& config)
+    void removeConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
     {
-        setConfig(configIndex, config, false);
+        setConfig(configIndex, *config, false);
     }
 
     ConfigSet filter(const BidRequest& br, const ExchangeConnector*) const;
@@ -316,14 +320,16 @@ struct LanguageRegexFilter : public FilterBaseT<LanguageRegexFilter>
 
     unsigned priority() const { return Priority::LanguageRegex; }
 
-    void addConfig(unsigned configIndex, const AgentConfig& config)
+    void addConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
     {
-        impl.addIncludeExclude(configIndex, config.languageFilter);
+        impl.addIncludeExclude(configIndex, config->languageFilter);
     }
 
-    void removeConfig(unsigned configIndex, const AgentConfig& config)
+    void removeConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
     {
-        impl.removeIncludeExclude(configIndex, config.languageFilter);
+        impl.removeIncludeExclude(configIndex, config->languageFilter);
     }
 
     ConfigSet filter(const BidRequest& br, const ExchangeConnector*) const

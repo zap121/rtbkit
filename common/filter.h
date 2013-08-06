@@ -13,6 +13,7 @@
 
 #include <vector>
 #include <string>
+#include <memory>
 #include <functional>
 
 
@@ -208,12 +209,16 @@ struct FilterBase
         associated with the given index. The configIndex should be used to
         return the ConfigSet object returned by the filter function.
      */
-    virtual void addConfig(unsigned configIndex, const AgentConfig& config) = 0;
+    virtual void addConfig(
+            unsigned configIndex,
+            const std::shared_ptr<AgentConfig>& config) = 0;
 
     /**
 
      */
-    virtual void removeConfig(unsigned configIndex, const AgentConfig& config) = 0;
+    virtual void removeConfig(
+            unsigned configIndex,
+            const std::shared_ptr<AgentConfig>& config) = 0;
 
     /**
        \todo This will eventually need to be dynamic or something.

@@ -33,181 +33,223 @@ initWithDefaultFilters(FilterPool& pool)
 }
 
 
-void
+bool
 FilterPool::
-setFilters(unique_ptr<Filters>& newFilters)
+setData(Data*& oldData, unique_ptr<Data>& newData)
 {
-    Filters* oldFilters = filters.exchange(newFilters.release());
-    gc.defer([=] { delete oldFilters; });
+    if (!data.compare_exchange_strong(oldData, newData.get()))
+        return false;
+
+    newData.release();
+    gc.defer([=] { delete oldData; });
+
+    return true;
 }
 
 
 FilterPool::
 ~FilterPool()
 {
-    std::unique_ptr<Filters> nil;
-    setFilters(nil);
+    {
+        GcLockBase::SharedGuard guard(gc);
+
+        unique_ptr<Data> nil;
+        Data* current = data.load();
+        while (!setData(current, nil));
+    }
+
     gc.deferBarrier();
 }
 
 
-ConfigSet
+FilterPool::ConfigList
 FilterPool::
 filter(const BidRequest& br, const ExchangeConnector* conn)
 {
-    GcLockBase::SharedGuard guard(gc);
+    GcLockBase::SharedGuard guard(gc, false);
 
-    Filters* current = filters.load();
+    Data* current = data.load();
     ConfigSet matching = current->activeConfigs;
 
-    for (FilterBase* filter : *current) {
+    for (FilterBase* filter : current->filters) {
         matching &= filter->filter(br, conn);
         if (matching.empty()) break;
     }
 
-    return matching;
-}
-
-
-void
-FilterPool::
-addFilter(const string& filterName)
-{
-    unique_ptr<FilterBase> filter(FilterRegistry::makeFilter(filterName));
-    addFilter(filter);
-}
-
-void
-FilterPool::
-addFilter(unique_ptr<FilterBase>& filter)
-{
-    unique_ptr<Filters> newFilters(new Filters(*filters.load()));
-
-    for (size_t i = 0; i < newFilters->size(); ++i) {
-        if ((*newFilters)[i]->name() == filter->name()) return;
+    ConfigList configs;
+    for (size_t i = matching.next();
+         i < matching.size();
+         i = matching.next(i + 1))
+    {
+        configs.push_back(current->configs[i].second);
     }
 
-    for (size_t i = 0; i < configs.size(); ++i) {
-        if (!configs[i]) continue;
-        filter->addConfig(i, *configs[i]);
-    }
-
-    newFilters->push_back(filter.release());
-
-    auto lessFn = [] (FilterBase* lhs, FilterBase* rhs) {
-        return lhs->priority() < rhs->priority();
-    };
-    std::sort(newFilters->begin(), newFilters->end(), lessFn);
-
-    setFilters(newFilters);
+    return configs;
 }
 
 
 void
 FilterPool::
-removeFilter(const string& filterName)
+addFilter(const string& name)
 {
-    Filters* current = filters.load();
+    GcLockBase::SharedGuard guard(gc);
 
-    unique_ptr<Filters> newFilters(new Filters(*current, filterName));
-    if (newFilters->size() == current->size()) return;
+    Data* oldData = data.load();
+    unique_ptr<Data> newData;
 
-    setFilters(newFilters);
-}
-
-
-size_t
-FilterPool::
-addConfig(shared_ptr<AgentConfig>& config)
-{
-    size_t index = 0;
-    for (; index < configs.size(); ++index) {
-        if (configs[index]) continue;
-
-        configs[index] = config;
-        break;
-    }
-
-    if (index == configs.size())
-        configs.push_back(config);
-
-    unique_ptr<Filters> newFilters(new Filters(*filters.load()));
-    newFilters->activeConfigs.set(index);
-
-    for (size_t i = 0; i < newFilters->size(); ++i)
-        (*newFilters)[i]->addConfig(index, *config);
-
-    setFilters(newFilters);
-    return index;
+    do {
+        newData.reset(new Data(*oldData));
+        newData->addFilter(FilterRegistry::makeFilter(name));
+    } while (!setData(oldData, newData));
 }
 
 
 void
 FilterPool::
-removeConfig(shared_ptr<AgentConfig> config)
+removeFilter(const string& name)
 {
-    size_t index = 0;
-    for (; index < configs.size(); ++index) {
-        if (configs[index] == config) break;
-    }
+    GcLockBase::SharedGuard guard(gc);
 
-    removeConfig(index);
+    unique_ptr<Data> newData;
+    Data* oldData = data.load();
+
+    do {
+        newData.reset(new Data(*oldData));
+        newData->removeFilter(name);
+    } while (!setData(oldData, newData));
 }
 
 
 void
 FilterPool::
-removeConfig(size_t configIndex)
+addConfig(const string& name, const shared_ptr<AgentConfig>& config)
 {
-    ExcCheckLess(configIndex, configs.size(), "unknown config: " + configIndex);
-    ExcCheck(configs[configIndex], "unknown config: " + configIndex);
+    GcLockBase::SharedGuard guard(gc);
 
-    auto config = configs[configIndex];
-    configs[configIndex].reset();
+    unique_ptr<Data> newData;
+    Data* oldData = data.load();
 
-    unique_ptr<Filters> newFilters(new Filters(*filters.load()));
-    newFilters->activeConfigs.reset(configIndex);
+    do {
+        newData.reset(new Data(*oldData));
+        newData->addConfig(name, config);
+    } while (!setData(oldData, newData));
+}
 
-    for (size_t i = 0; i < newFilters->size(); ++i)
-        (*newFilters)[i]->removeConfig(configIndex, *config);
 
-    setFilters(newFilters);
+void
+FilterPool::
+removeConfig(const string& name)
+{
+    GcLockBase::SharedGuard guard(gc);
+
+    unique_ptr<Data> newData;
+    Data* oldData = data.load();
+
+    do {
+        newData.reset(new Data(*oldData));
+        newData->removeConfig(name);
+    } while (!setData(oldData, newData));
 }
 
 
 /******************************************************************************/
-/* FILTER POOL - FILTERS                                                      */
+/* FILTER POOL - DATA                                                         */
 /******************************************************************************/
 
-FilterPool::Filters::
-Filters(const Filters& other) : activeConfigs(other.activeConfigs)
-{
-    reserve(other.size());
-
-    for (size_t i = 0; i < other.size(); ++i)
-        (*this)[i] = other[i]->clone();
-}
-
-
-FilterPool::Filters::
-Filters(const Filters& other, const string& name) :
+FilterPool::Data::
+Data(const Data& other) :
+    configs(other.configs),
     activeConfigs(other.activeConfigs)
 {
-    reserve(other.size() - 1);
-
-    for (size_t i = 0, j = 0; i < other.size(); ++i) {
-        if ((*this)[i]->name() == name) continue;
-
-        (*this)[j] = other[i]->clone();
-        ++j;
-    }
+    filters.reserve(other.filters.size());
+    for (FilterBase* filter : other.filters)
+        filters.push_back(filter->clone());
 }
 
 
-FilterPool::Filters::
-~Filters()
+FilterPool::Data::
+~Data()
 {
-    for (const auto& filter : *this) delete filter;
+    for (FilterBase* filter : filters) delete filter;
+}
+
+ssize_t
+FilterPool::Data::
+findConfig(const string& name) const
+{
+    for (size_t i = 0; i < configs.size(); ++i) {
+        if (configs[i].first == name) return i;
+    }
+    return -1;
+}
+
+void
+FilterPool::Data::
+addConfig(const string& name, const shared_ptr<AgentConfig>& config)
+{
+    ssize_t index = findConfig("");
+
+    if (index >= 0)
+        configs[index] = make_pair(name, config);
+    else {
+        index = configs.size();
+        configs.emplace_back(make_pair(name, config));
+    }
+
+    activeConfigs.set(index);
+    for (FilterBase* filter : filters)
+        filter->addConfig(index, config);
+}
+
+void
+FilterPool::Data::
+removeConfig(const string& name)
+{
+    ssize_t index = findConfig(name);
+    if (index < 0) return;
+
+    activeConfigs.reset(index);
+    for (FilterBase* filter : filters)
+        filter->removeConfig(index, configs[index].second);
+
+    configs[index].first = "";
+    configs[index].second.reset();
+}
+
+
+ssize_t
+FilterPool::Data::
+findFilter(const string& name) const
+{
+    for (size_t i = 0; i < filters.size(); ++i) {
+        if (filters[i]->name() == name) return i;
+    }
+    return -1;
+}
+
+void
+FilterPool::Data::
+addFilter(FilterBase* filter)
+{
+    filters.push_back(filter);
+    sort(filters.begin(), filters.end(), [] (FilterBase* lhs, FilterBase* rhs) {
+                return lhs->priority() < rhs->priority();
+            });
+}
+
+void
+FilterPool::Data::
+removeFilter(const string& name)
+{
+    ssize_t index = findFilter(name);
+    if (index < 0) return;
+
+    delete filters[index];
+
+    for (size_t i = index; i < filters.size() - 1; ++i)
+        filters[i] = filters[i+1];
+
+    filters.pop_back();
 }
 
 } // namepsace RTBKit
