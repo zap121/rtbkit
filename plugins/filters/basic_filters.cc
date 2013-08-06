@@ -122,6 +122,7 @@ struct InitFilters
     {
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::HourOfWeekFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::SegmentsFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::LanguageRegexFilter>();
     }
 
 } initFilters;
