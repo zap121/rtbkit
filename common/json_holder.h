@@ -17,6 +17,7 @@
 
 namespace RTBKIT {
 
+struct JsonHolderDescription;
 
 /*****************************************************************************/
 /* JSON HOLDER                                                               */
@@ -115,7 +116,7 @@ struct JsonHolder {
     JML_IMPLEMENT_OPERATOR_BOOL(valid());
 #endif
 
-    static void createDescription(Datacratic::DefaultDescription<JsonHolder>&);
+    static void createDescription(JsonHolderDescription&);
 
 private:    
     void makeString() const;
@@ -129,15 +130,7 @@ IMPL_SERIALIZE_RECONSTITUTE(JsonHolder);
 
 std::ostream & operator << (std::ostream & stream, const JsonHolder & json);
 
-} // namespace RTBKIT
+CREATE_CLASS_DESCRIPTION(JsonHolder)
 
-namespace Datacratic {
-    template<>
-    struct DefaultDescription<RTBKIT::JsonHolder> :
-        public StructureDescription<RTBKIT::JsonHolder> {
-        DefaultDescription() {
-            RTBKIT::JsonHolder::createDescription(*this);
-        }
-    };
-}
+} // namespace RTBKIT
 

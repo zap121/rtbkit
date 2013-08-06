@@ -46,6 +46,8 @@ struct SubmittedAuctionEvent {
     void reconstitute(ML::DB::Store_Reader & store);
 };
 
+CREATE_STRUCTURE_DESCRIPTION(SubmittedAuctionEvent)
+
 /*****************************************************************************/
 /* POST AUCTION EVENT TYPE                                                   */
 /*****************************************************************************/
@@ -233,12 +235,4 @@ struct DeliveryEvent
 };
 
 } // namespace RTBKIT
-
-namespace Datacratic {
-    template<>
-    struct DefaultDescription<RTBKIT::SubmittedAuctionEvent> :
-        public StructureDescription<RTBKIT::SubmittedAuctionEvent> {
-        DefaultDescription();
-    };
-}
 

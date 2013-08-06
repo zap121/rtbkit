@@ -94,13 +94,14 @@ struct Message {
     }
 
     std::string toString() const {
-        static DefaultDescription<T> desc;
+        using namespace Datacratic;
+        static ValueDescription * desc = getDefaultDescription((T*) 0);
 
         std::stringstream stream;
         StreamJsonPrintingContext context(stream);
-        desc.printJsonTyped(&payload, context);
+        desc->printJson(&payload, context);
 
-        return ML::format("{\"%s\":%s}", desc.typeName, stream.str());
+        return ML::format("{\"%s\":%s}", desc->typeName, stream.str());
     }
 
     static Message<T> fromString(std::string const & value) {
@@ -108,7 +109,7 @@ struct Message {
         ML::Parse_Context source("Message", value.c_str(), value.size());
         expectJsonObject(source, [&](std::string key,
                                      ML::Parse_Context & context) {
-            auto desc = ValueDescription::get(key);
+            auto * desc = ValueDescription::get(key);
             if(desc) {
                 StreamingJsonParsingContext json(context);
                 desc->parseJson(&result.payload, json);
