@@ -69,19 +69,19 @@ filter(const BidRequest& br, const ExchangeConnector* conn)
     GcLockBase::SharedGuard guard(gc, false);
 
     Data* current = data.load();
-    ConfigSet matching = current->activeConfigs;
+    FilterState state(br, conn, current->activeConfigs);
 
     for (FilterBase* filter : current->filters) {
-        matching &= filter->filter(br, conn);
-        if (matching.empty()) break;
+        filter->filter(state);
+        if (state.configs().empty()) break;
     }
 
     ConfigList configs;
-    for (size_t i = matching.next();
-         i < matching.size();
-         i = matching.next(i + 1))
+    for (size_t i = state.configs().next();
+         i < state.configs().size();
+         i = state.configs().next(i + 1))
     {
-        configs.push_back(current->configs[i].second);
+        configs.emplace_back(current->configs[i].second, state.biddableSpots(i));
     }
 
     return configs;

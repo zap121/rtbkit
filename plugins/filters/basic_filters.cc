@@ -30,33 +30,29 @@ setConfig(unsigned configIndex, const AgentConfig& config, bool value)
     }
 }
 
-ConfigSet
+void
 SegmentsFilter::
-filter(const BidRequest& br, const ExchangeConnector*) const
+filter(FilterState& state) const
 {
-    ConfigSet matches(true);
-
     unordered_set<string> toCheck = excludeIfNotPresent;
 
-    for (const auto& segment : br.segments) {
+    for (const auto& segment : state.request.segments) {
         toCheck.erase(segment.first);
 
         auto it = data.find(segment.first);
         if (it == data.end()) continue;
 
-        matches &= it->second.filter(*segment.second);
-        if (matches.empty()) return matches;
+        state.narrowConfigs(it->second.filter(*segment.second));
+        if (state.configs().empty()) return;
     }
 
-    for(const auto& segment : toCheck) {
+    for (const auto& segment : toCheck) {
         auto it = data.find(segment);
         if (it == data.end()) continue;
 
-        matches &= it->second.excludeIfNotPresent.negate();
-        if (matches.empty()) return matches;
+        state.narrowConfigs(it->second.excludeIfNotPresent.negate());
+        if (state.configs().empty()) return;
     }
-
-    return matches;
 }
 
 
@@ -125,6 +121,9 @@ struct InitFilters
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::HourOfWeekFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::SegmentsFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::LanguageRegexFilter>();
+
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::ExchangePreFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::ExchangePostFilter>();
     }
 
 } initFilters;

@@ -33,7 +33,10 @@ struct FilterPool
 {
     ~FilterPool();
 
-    typedef std::vector< std::shared_ptr<AgentConfig> > ConfigList;
+
+    typedef std::pair<std::shared_ptr<AgentConfig>, BiddableSpots> ConfigEntry;
+    typedef std::vector<ConfigEntry> ConfigList;
+
     ConfigList filter(const BidRequest& br, const ExchangeConnector* conn);
 
 

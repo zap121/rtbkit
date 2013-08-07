@@ -1,4 +1,4 @@
-/** filter.h                                 -*- C++ -*-
+ /** filter.h                                 -*- C++ -*-
     Rémi Attab, 23 Jul 2013
     Copyright (c) 2013 Datacratic.  All rights reserved.
 
@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "rtbkit/core/router/router_types.h"
 #include "jml/arch/bitops.h"
 
 #include <vector>
@@ -183,6 +184,38 @@ private:
 
 
 /******************************************************************************/
+/* FILTER STATE                                                               */
+/******************************************************************************/
+
+struct FilterState
+{
+    FilterState(const BidRequest& br, const ExchangeConnector* ex, ConfigSet configs) :
+        request(br), exchange(ex), configs_(std::move(configs))
+    {}
+
+    const BidRequest& request;
+    const ExchangeConnector * const exchange;
+
+    const ConfigSet& configs() const { return configs_; }
+    void narrowConfigs(const ConfigSet& mask) { configs_ &= mask; }
+
+    const BiddableSpots& biddableSpots(unsigned configIndex)
+    {
+        return biddableSpots_[configIndex];
+    }
+    void addBiddableSpot(
+            unsigned configIndex, unsigned spot, SmallIntVector creatives)
+    {
+        biddableSpots_[configIndex].emplace_back(spot, creatives);
+    }
+
+private:
+    ConfigSet configs_;
+    std::unordered_map<unsigned, BiddableSpots> biddableSpots_;
+};
+
+
+/******************************************************************************/
 /* FILTER BASE                                                                */
 /******************************************************************************/
 
@@ -201,24 +234,21 @@ struct FilterBase
     /** Filters the given bid request such and a return the set of agent
         configuration that matches the given bid request.
      */
-    virtual ConfigSet
-    filter(const BidRequest&, const ExchangeConnector*) const = 0;
+    virtual void filter(FilterState& state) const = 0;
 
 
     /** Indicates that a new agent configuration is available and that it is
         associated with the given index. The configIndex should be used to
         return the ConfigSet object returned by the filter function.
      */
-    virtual void addConfig(
-            unsigned configIndex,
-            const std::shared_ptr<AgentConfig>& config) = 0;
+    virtual void
+    addConfig(unsigned configIndex, const std::shared_ptr<AgentConfig>& config) = 0;
 
     /**
 
      */
-    virtual void removeConfig(
-            unsigned configIndex,
-            const std::shared_ptr<AgentConfig>& config) = 0;
+    virtual void
+    removeConfig(unsigned configIndex, const std::shared_ptr<AgentConfig>& config) = 0;
 
     /**
        \todo This will eventually need to be dynamic or something.
@@ -226,19 +256,6 @@ struct FilterBase
     virtual unsigned priority() const { return 0; }
 
 };
-
-
-template<typename Filter>
-struct FilterBaseT : public FilterBase
-{
-    std::string name() const { return Filter::name; }
-
-    FilterBase* clone() const
-    {
-        return new Filter(*static_cast<const Filter*>(this));
-    }
-};
-
 
 /******************************************************************************/
 /* FILTER REGISTRY                                                            */

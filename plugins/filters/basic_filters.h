@@ -8,14 +8,13 @@
 
 #pragma once
 
-#include "rtbkit/core/agent_configuration/agent_config.h"
-#include "rtbkit/core/agent_configuration/include_exclude.h"
-#include "rtbkit/common/filter.h"
 #include "generic_filters.h"
+#include "rtbkit/common/exchange_connector.h"
 
 #include <array>
 #include <unordered_map>
 #include <unordered_set>
+#include <mutex>
 
 
 namespace RTBKIT {
@@ -27,9 +26,18 @@ namespace RTBKIT {
 
 struct Priority
 {
-    static constexpr unsigned HourOfWeek    = 0x10000;
-    static constexpr unsigned Segment       = 0x20000;
-    static constexpr unsigned LanguageRegex = 0x30000;
+    static constexpr unsigned ExchangePre   = 0x000000;
+
+    static constexpr unsigned Creative      = 0x010000;
+
+    static constexpr unsigned HourOfWeek    = 0x020000;
+    static constexpr unsigned Segment       = 0x030000;
+
+    static constexpr unsigned UrlRegex      = 0x040000;
+    static constexpr unsigned LanguageRegex = 0x050000;
+    static constexpr unsigned LocationRegex = 0x060000;
+
+    static constexpr unsigned ExchangePost  = 0xFF0000;
 };
 
 
@@ -56,10 +64,10 @@ struct HourOfWeekFilter : public FilterBaseT<HourOfWeekFilter>
         setConfig(configIndex, *config, false);
     }
 
-    ConfigSet filter(const BidRequest& br, const ExchangeConnector*) const
+    void filter(FilterState& state) const
     {
-        ExcCheckNotEqual(br.timestamp, Date(), "Null auction date");
-        return data[br.timestamp.hourOfWeek()];
+        ExcCheckNotEqual(state.request.timestamp, Date(), "Null auction date");
+        state.narrowConfigs(data[state.request.timestamp.hourOfWeek()]);
     }
 
 private:
@@ -102,7 +110,7 @@ struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
         setConfig(configIndex, *config, false);
     }
 
-    ConfigSet filter(const BidRequest& br, const ExchangeConnector*) const;
+    void filter(FilterState& state) const;
 
 
 private:
@@ -152,12 +160,44 @@ private:
 
 
 /******************************************************************************/
+/* URL FILTER                                                                 */
+/******************************************************************************/
+
+struct UrlRegexFilter : public FilterBaseT<UrlRegexFilter>
+{
+    static constexpr const char* name = "UrlRegex";
+    unsigned priority() const { return Priority::UrlRegex; }
+
+    void addConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        impl.addIncludeExclude(configIndex, config->urlFilter);
+    }
+
+    void removeConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        impl.removeIncludeExclude(configIndex, config->urlFilter);
+    }
+
+    void filter(FilterState& state) const
+    {
+        state.narrowConfigs(impl.filter(state.request.url.toString()));
+    }
+
+private:
+    typedef RegexFilter<boost::regex, std::string> BaseFilter;
+    IncludeExcludeFilter<BaseFilter> impl;
+};
+
+
+/******************************************************************************/
 /* LANGUAGE FILTER                                                            */
 /******************************************************************************/
 
 struct LanguageRegexFilter : public FilterBaseT<LanguageRegexFilter>
 {
-    static constexpr const char* name = "languageRegex";
+    static constexpr const char* name = "LanguageRegex";
     unsigned priority() const { return Priority::LanguageRegex; }
 
     void addConfig(
@@ -172,14 +212,131 @@ struct LanguageRegexFilter : public FilterBaseT<LanguageRegexFilter>
         impl.removeIncludeExclude(configIndex, config->languageFilter);
     }
 
-    ConfigSet filter(const BidRequest& br, const ExchangeConnector*) const
+    void filter(FilterState& state) const
     {
-        return impl.filter(br.language.rawString());
+        state.narrowConfigs(impl.filter(state.request.language.rawString()));
     }
 
 private:
     typedef RegexFilter<boost::regex, std::string> BaseFilter;
     IncludeExcludeFilter<BaseFilter> impl;
+};
+
+
+/******************************************************************************/
+/* LOCATION FILTER                                                            */
+/******************************************************************************/
+
+struct LocationRegexFilter : public FilterBaseT<LocationRegexFilter>
+{
+    static constexpr const char* name = "LocationRegex";
+    unsigned priority() const { return Priority::LocationRegex; }
+
+    void addConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        impl.addIncludeExclude(configIndex, config->locationFilter);
+    }
+
+    void removeConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        impl.removeIncludeExclude(configIndex, config->locationFilter);
+    }
+
+    void filter(FilterState& state) const
+    {
+        Utf8String location = state.request.location.fullLocationString();
+        state.narrowConfigs(impl.filter(location));
+    }
+
+private:
+    typedef RegexFilter<boost::u32regex, Utf8String> BaseFilter;
+    IncludeExcludeFilter<BaseFilter> impl;
+};
+
+
+/******************************************************************************/
+/* EXCHANGE FILTER                                                            */
+/******************************************************************************/
+
+/** The lock makes it next to impossible to do any kind of pre-processing. */
+struct ExchangePreFilter : public IterativeFilter<ExchangePreFilter>
+{
+    static constexpr const char* name = "ExchangePre";
+    unsigned priority() const { return Priority::ExchangePre; }
+
+    bool filterConfig(FilterState& state, const AgentConfig& config) const
+    {
+        if (!state.exchange) return true;
+
+        const void * exchangeInfo = nullptr;
+
+        {
+            std::lock_guard<ML::Spinlock> guard(config.lock);
+            auto it = config.providerData.find(state.exchange->exchangeName());
+            if (it == config.providerData.end()) return false;
+
+            exchangeInfo = it->second.get();
+        }
+
+        return state.exchange->bidRequestPreFilter(
+                state.request, config, exchangeInfo);
+    }
+};
+
+struct ExchangePostFilter : public IterativeFilter<ExchangePostFilter>
+{
+    static constexpr const char* name = "ExchangePost";
+    unsigned priority() const { return Priority::ExchangePost; }
+
+    bool filterConfig(FilterState& state, const AgentConfig& config) const
+    {
+        if (!state.exchange) return true;
+
+        const void * exchangeInfo = nullptr;
+
+        {
+            std::lock_guard<ML::Spinlock> guard(config.lock);
+            auto it = config.providerData.find(state.exchange->exchangeName());
+            if (it == config.providerData.end()) return false;
+
+            exchangeInfo = it->second.get();
+        }
+
+        return state.exchange->bidRequestPostFilter(
+                state.request, config, exchangeInfo);
+    }
+};
+
+
+/******************************************************************************/
+/* CREATIVE FILTER                                                            */
+/******************************************************************************/
+
+struct CreativeFilter : public FilterBaseT<CreativeFilter>
+{
+    static constexpr const char* name = "Creative";
+    unsigned priority() const { return Priority::Creative; }
+
+
+    void addConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+    }
+
+    void removeConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+    }
+
+    void filter(FilterState& state) const
+    {
+        if (!state.exchange) {
+            state.narrowConfigs(ConfigSet());
+            return;
+        }
+    }
 };
 
 

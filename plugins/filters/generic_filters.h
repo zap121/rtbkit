@@ -6,10 +6,78 @@
 
 */
 
+#include "rtbkit/core/agent_configuration/agent_config.h"
+#include "rtbkit/core/agent_configuration/include_exclude.h"
+#include "rtbkit/common/filter.h"
+
 #pragma once
 
 namespace RTBKIT {
 
+
+/******************************************************************************/
+/* FILTER BASE T                                                              */
+/******************************************************************************/
+
+template<typename Filter>
+struct FilterBaseT : public FilterBase
+{
+    std::string name() const { return Filter::name; }
+
+    FilterBase* clone() const
+    {
+        return new Filter(*static_cast<const Filter*>(this));
+    }
+};
+
+
+/******************************************************************************/
+/* CONFIG FILTER                                                              */
+/******************************************************************************/
+
+/** These filters are discouraged because they do not scale well. */
+template<typename Filter>
+struct IterativeFilter : public FilterBaseT<Filter>
+{
+    virtual void addConfig(
+            unsigned configIndex,
+            const std::shared_ptr<AgentConfig>& config)
+    {
+        if (configIndex >= configs.size())
+            configs.resize(configIndex + 1);
+
+        configs[configIndex] = config;
+    }
+
+    virtual void removeConfig(
+            unsigned configIndex,
+            const std::shared_ptr<AgentConfig>& config)
+    {
+        configs[configIndex].reset();
+    }
+
+    virtual void filter(FilterState& state) const
+    {
+        ConfigSet matches = state.configs();
+
+        for (size_t i = matches.next();
+             i < matches.size();
+             i = matches.next(i+1))
+        {
+            ExcAssert(configs[i]);
+
+            if (!filterConfig(state, *configs[i])) continue;
+            matches.reset(i);
+        }
+
+        state.narrowConfigs(matches);
+    }
+
+    virtual bool filterConfig(FilterState&, const AgentConfig&) const = 0;
+
+private:
+    std::vector< std::shared_ptr<AgentConfig> > configs;
+};
 
 
 /******************************************************************************/
@@ -24,67 +92,49 @@ namespace RTBKIT {
 template<typename Regex, typename Str>
 struct RegexFilter
 {
-    void addConfig(unsigned configIndex, const Str& pattern)
-    {
-        setConfig(configIndex, pattern, true);
-    }
-
     void addConfig(unsigned configIndex, const Regex& regex)
     {
-        setConfig(configIndex, regex.str(), true);
+        auto& entry = data[regex.str()];
+        if (entry.regex.empty()) entry.regex = regex;
+        entry.configs.set(configIndex);
     }
 
     void addConfig(unsigned configIndex, const CachedRegex<Regex, Str>& regex)
     {
-        setConfig(configIndex, regex.base.str(), true);
-    }
-
-
-    void removeConfig(unsigned configIndex, const Str& pattern)
-    {
-        setConfig(configIndex, pattern, false);
+        addConfig(configIndex, regex.base);
     }
 
     void removeConfig(unsigned configIndex, const Regex& regex)
     {
-        setConfig(configIndex, regex.str(), false);
+        auto it = data.find(regex.str());
+        if (it == data.end()) return;
+
+        it->second.configs.reset(configIndex);
+        if (it->second.configs.empty()) data.erase(it);
     }
 
     void removeConfig(unsigned configIndex, const CachedRegex<Regex, Str>& regex)
     {
-        setConfig(configIndex, regex.base.str(), false);
+        removeConfig(configIndex, regex.base);
     }
 
 
     ConfigSet filter(const Str& str) const
     {
-        ConfigSet configs;
+        ConfigSet matches;
 
         for (const auto& entry : data)
-            configs |= entry.second.filter(str);
+            matches |= entry.second.filter(str);
 
-        return configs;
+        return matches;
     }
 
 private:
-
-    void setConfig(unsigned configIndex, const Str& pattern, bool value)
-    {
-        data[pattern].set(configIndex, pattern, value);
-    }
 
     struct RegexData
     {
         Regex regex;
         ConfigSet configs;
-
-        void set(unsigned configIndex, const Str& pattern, bool value)
-        {
-            if (regex.empty())
-                createRegex(regex, pattern);
-
-            configs.set(configIndex, value);
-        }
 
         ConfigSet filter(const Str& str) const
         {
@@ -92,7 +142,8 @@ private:
         }
     };
 
-    std::unordered_map<Str, RegexData> data;
+    typedef std::basic_string<typename Regex::value_type> KeyT;
+    std::unordered_map<KeyT, RegexData> data;
 };
 
 
