@@ -251,7 +251,9 @@ struct FilterRegistry
     template<typename Filter>
     static void registerFilter()
     {
-        registerFilter(Filter::name, [] () -> FilterBase* { return new Filter(); });
+        registerFilter(Filter::name, [] () -> FilterBase* {
+                    return new Filter();
+                });
     }
 
     static void registerFilter(const std::string& name, ConstructFn fn);

@@ -100,6 +100,8 @@ filter(const SegmentList& segments) const
                 includes |= include.get(i, str);
             });
 
+    if (includes.empty()) return includes;
+
     segments.forEach([&](int i, string str, float weights) {
                 includes &= exclude.get(i, str).negate();
             });
