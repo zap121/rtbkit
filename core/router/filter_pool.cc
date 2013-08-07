@@ -187,8 +187,11 @@ void
 FilterPool::Data::
 addConfig(const string& name, const shared_ptr<AgentConfig>& config)
 {
-    ssize_t index = findConfig("");
+    // If our config already exists, we have to deregister it with the filters
+    // before we can add the new config.
+    removeConfig(name);
 
+    ssize_t index = findConfig("");
     if (index >= 0)
         configs[index] = make_pair(name, config);
     else {
