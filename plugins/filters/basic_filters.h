@@ -10,6 +10,7 @@
 
 #include "generic_filters.h"
 #include "rtbkit/common/exchange_connector.h"
+#include "jml/utils/compact_vector.h"
 
 #include <array>
 #include <unordered_map>
@@ -311,6 +312,95 @@ struct ExchangePostFilter : public IterativeFilter<ExchangePostFilter>
 
 
 /******************************************************************************/
+/* CREATIVE MATRIX                                                            */
+/******************************************************************************/
+
+struct CreativeMatrix
+{
+    CreativeMatrix(bool defaultValue = false) :
+        defaultValue(ConfigSet(defaultValue))
+    {}
+
+    size_t size() const { return matrix.size(); }
+
+    bool empty() const
+    {
+        for (const ConfigSet& set : matrix) {
+            if (!set.empty()) return false;
+        }
+        return true;
+    }
+
+    void expand(size_t newSize)
+    {
+        if (newSize <= matrix.size()) return;
+        matrix.resize(newSize, defaultValue);
+    }
+
+
+    const ConfigSet& operator[] (size_t index) const { return matrix[index]; }
+
+    void set(size_t creative, size_t config, bool value = true)
+    {
+        expand(creative + 1);
+        matrix[creative].set(config, value);
+    }
+
+    void reset(size_t creative, size_t config)
+    {
+        expand(creative + 1);
+        matrix[creative].reset(config);
+    }
+
+#define RTBKIT_CREATIVE_MATRIX_OP(_op_)                                 \
+    CreativeMatrix& operator _op_ (const CreativeMatrix& other)         \
+    {                                                                   \
+        expand(other.matrix.size());                                    \
+                                                                        \
+        for (size_t i = 0; i < other.matrix.size(); ++i)                \
+            matrix[i] _op_ other.matrix[i];                             \
+                                                                        \
+        for (size_t i = other.matrix.size(); i < matrix.size(); ++i)    \
+            matrix[i] _op_ other.defaultValue;                          \
+                                                                        \
+        return *this;                                                   \
+    }
+
+    RTBKIT_CREATIVE_MATRIX_OP(&=)
+    RTBKIT_CREATIVE_MATRIX_OP(|=)
+    RTBKIT_CREATIVE_MATRIX_OP(^=)
+
+#undef RTBKIT_CREATIVE_MATRIX_OP
+
+    CreativeMatrix& negate()
+    {
+        for (ConfigSet& set : matrix) set.negate();
+        return *this;
+    }
+
+    CreativeMatrix negate() const
+    {
+        return CreativeMatrix(*this).negate();
+    }
+
+    ConfigSet aggregate() const
+    {
+        ConfigSet configs;
+
+        for (const ConfigSet& set : matrix)
+            configs |= set;
+
+        return configs;
+    }
+
+
+private:
+    ML::compact_vector<ConfigSet, 8> matrix;
+    ConfigSet defaultValue;
+};
+
+
+/******************************************************************************/
 /* CREATIVE FILTER                                                            */
 /******************************************************************************/
 
@@ -323,20 +413,82 @@ struct CreativeFilter : public FilterBaseT<CreativeFilter>
     void addConfig(
             unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
     {
+        setConfig(configIndex, *config, true);
     }
 
     void removeConfig(
             unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
     {
+        setConfig(configIndex, *config, false);
     }
 
     void filter(FilterState& state) const
     {
-        if (!state.exchange) {
-            state.narrowConfigs(ConfigSet());
-            return;
+        ConfigSet configs;
+
+        for (unsigned impId = 0; impId < state.request.imp.size(); ++impId) {
+
+            CreativeMatrix matrix;
+            const AdSpot& imp = state.request.imp[impId];
+
+            for (const auto& format : imp.formats) {
+                auto it = formatFilter.find(makeKey(format));
+                if (it == formatFilter.end()) continue;
+
+                matrix |= it->second;
+            }
+
+
+            if (matrix.empty()) continue;
+            processMatrix(state, matrix, impId);
+            configs |= matrix.aggregate();
+        }
+
+        state.narrowConfigs(configs);
+    }
+
+private:
+
+    void processMatrix(FilterState& state, CreativeMatrix& matrix, size_t impId) const
+    {
+        std::unordered_map<unsigned, SmallIntVector> biddableCreatives;
+
+        for (unsigned creativeId = 0; creativeId < matrix.size(); ++creativeId) {
+            const auto& configs = matrix[creativeId];
+            if (configs.empty()) continue;
+
+            for (size_t config = configs.next();
+                 config < configs.size();
+                 config = configs.next(config + 1))
+            {
+                biddableCreatives[config].push_back(creativeId);
+            }
+        }
+
+        for (const auto& entry : biddableCreatives)
+            state.addBiddableSpot(entry.first, impId, entry.second);
+    }
+
+    void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
+    {
+        for (size_t i = 0; i < config.creatives.size(); ++i) {
+            const Creative& creative = config.creatives[i];
+
+            auto formatKey = makeKey(creative.format);
+            formatFilter[formatKey].set(i, configIndex, value);
         }
     }
+
+    typedef uint32_t FormatKey;
+    static_assert(sizeof(FormatKey) == sizeof(Format),
+            "Conversion of FormatKey depends on size of Format");
+
+    FormatKey makeKey(const Format& format) const
+    {
+        return uint32_t(format.width << 16 | format.height);
+    }
+
+    std::unordered_map<uint32_t, CreativeMatrix> formatFilter;
 };
 
 
