@@ -10,6 +10,7 @@
 #pragma once
 
 #include "rtbkit/core/router/router_types.h"
+#include "jml/utils/compact_vector.h"
 #include "jml/arch/bitops.h"
 
 #include <vector>
@@ -56,7 +57,7 @@ struct ConfigSet
 
     void set(size_t index)
     {
-        expand(index);
+        expand(index + 1);
         bitfield[index / Div] |= 1ULL << (index % Div);
     }
 
@@ -68,7 +69,7 @@ struct ConfigSet
 
     void reset(size_t index)
     {
-        expand(index);
+        expand(index + 1);
         bitfield[index / Div] &= ~(1ULL << (index % Div));
     }
 
@@ -98,44 +99,25 @@ struct ConfigSet
     }
 
 
-    ConfigSet& operator &= (const ConfigSet& other)
-    {
-        expand(other.size());
-
-        for (size_t i = 0; i < other.size(); ++i)
-            bitfield[i] &= other.bitfield[i];
-
-        for (size_t i = other.size(); i < bitfield.size(); ++i)
-            bitfield[i] &= other.defaultValue;
-
-        return *this;
+#define RTBKIT_CONFIG_SET_OP(_op_)                              \
+    ConfigSet& operator _op_ (const ConfigSet& other)           \
+    {                                                           \
+        expand(other.size());                                   \
+                                                                \
+        for (size_t i = 0; i < other.size(); ++i)               \
+            bitfield[i] _op_ other.bitfield[i];                 \
+                                                                \
+        for (size_t i = other.size(); i < bitfield.size(); ++i) \
+            bitfield[i] _op_ other.defaultValue;                \
+                                                                \
+        return *this;                                           \
     }
 
-    ConfigSet& operator |= (const ConfigSet& other)
-    {
-        expand(other.size());
+    RTBKIT_CONFIG_SET_OP(&=)
+    RTBKIT_CONFIG_SET_OP(|=)
+    RTBKIT_CONFIG_SET_OP(^=)
 
-        for (size_t i = 0; i < other.size(); ++i)
-            bitfield[i] |= other.bitfield[i];
-
-        for (size_t i = other.size(); i < bitfield.size(); ++i)
-            bitfield[i] |= other.defaultValue;
-
-        return *this;
-    }
-
-    ConfigSet& operator ^= (const ConfigSet& other)
-    {
-        expand(other.size());
-
-        for (size_t i = 0; i < other.size(); ++i)
-            bitfield[i] ^= other.bitfield[i];
-
-        for (size_t i = other.size(); i < bitfield.size(); ++i)
-            bitfield[i] ^= other.defaultValue;
-
-        return *this;
-    }
+#undef RTBKIT_CONFIG_SET_OP
 
     ConfigSet& negate()
     {
@@ -178,7 +160,7 @@ struct ConfigSet
 
 private:
 
-    std::vector<Word> bitfield;
+    ML::compact_vector<Word, 2> bitfield;
     Word defaultValue;
 };
 
