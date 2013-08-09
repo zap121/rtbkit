@@ -26,6 +26,9 @@ struct InitFilters
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::CreativeFormatFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::CreativeLanguageFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::CreativeLocationFilter>();
+
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::CreativeExchangeNameFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::CreativeExchangeFilter>();
     }
 
 } initFilters;

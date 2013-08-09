@@ -73,9 +73,13 @@ struct IterativeFilter : public FilterBaseT<Filter>
         state.narrowConfigs(matches);
     }
 
-    virtual bool filterConfig(FilterState&, const AgentConfig&) const = 0;
+    virtual bool filterConfig(FilterState&, const AgentConfig&) const
+    {
+        ExcAssert(false);
+        return false;
+    }
 
-private:
+protected:
     std::vector< std::shared_ptr<AgentConfig> > configs;
 };
 

@@ -10,6 +10,9 @@
 
 #include "generic_creative_filters.h"
 #include "priority.h"
+#include "rtbkit/common/exchange_connector.h"
+
+#include <mutex>
 
 namespace RTBKIT {
 
@@ -40,14 +43,11 @@ struct CreativeFormatFilter : public CreativeFilter<CreativeFormatFilter>
     void filterImpression(
             FilterState& state, unsigned impIndex, const AdSpot& imp) const
     {
-        CreativeMatrix creatives;
+        // The 0x0 format means: match anything.
+        CreativeMatrix creatives = get(Format(0,0));
 
-        for (const auto& format : imp.formats) {
-            auto it = formatFilter.find(makeKey(format));
-            if (it == formatFilter.end()) continue;
-
-            creatives |= it->second;
-        }
+        for (const auto& format : imp.formats)
+            creatives |= get(format);
 
         state.narrowCreativesForImp(impIndex, creatives);
     }
@@ -62,6 +62,12 @@ private:
     FormatKey makeKey(const Format& format) const
     {
         return uint32_t(format.width << 16 | format.height);
+    }
+
+    CreativeMatrix get(const Format& format) const
+    {
+        auto it = formatFilter.find(makeKey(format));
+        return it == formatFilter.end() ? CreativeMatrix() : it->second;
     }
 
     std::unordered_map<uint32_t, CreativeMatrix> formatFilter;
@@ -134,13 +140,14 @@ private:
 
 
 /******************************************************************************/
-/* CREATIVE EXCHANGE FILTER                                                   */
+/* CREATIVE EXCHANGE NAME FILTER                                              */
 /******************************************************************************/
 
-struct CreativeExchangeFilter : public FilterBaseT<CreativeExchangeFilter>
+struct CreativeExchangeNameFilter :
+        public CreativeFilter<CreativeExchangeNameFilter>
 {
-    static constexpr const char* name = "CreativeExchange";
-    unsigned priority() const { return Priority::CreativeExchange; }
+    static constexpr const char* name = "CreativeExchangeName";
+    unsigned priority() const { return Priority::CreativeExchangeName; }
 
 
     void addCreative(
@@ -155,7 +162,6 @@ struct CreativeExchangeFilter : public FilterBaseT<CreativeExchangeFilter>
         impl.removeIncludeExclude(cfgIndex, crIndex, creative.languageFilter);
     }
 
-
     void filter(FilterState& state) const
     {
         state.narrowAllCreatives(impl.filter(state.request.exchange));
@@ -163,6 +169,57 @@ struct CreativeExchangeFilter : public FilterBaseT<CreativeExchangeFilter>
 
 private:
     CreativeIncludeExcludeFilter< CreativeListFilter<std::string> > impl;
+};
+
+
+/******************************************************************************/
+/* CREATIVE EXCHANGE FILTER                                                   */
+/******************************************************************************/
+
+/** \todo Find a way to write an efficient version of this. */
+struct CreativeExchangeFilter : public IterativeFilter<CreativeExchangeFilter>
+{
+    static constexpr const char* name = "CreativeExchange";
+    unsigned priority() const { return Priority::CreativeExchange; }
+
+    void filter(FilterState& state) const
+    {
+        // no exchange connector means evertyhing gets filtered out.
+        if (!state.exchange) {
+            state.narrowAllCreatives(CreativeMatrix());
+            return;
+        }
+
+        CreativeMatrix creatives;
+
+        for (size_t cfgId = 0; cfgId < configs.size(); ++cfgId) {
+            const auto& config = *configs[cfgId];
+
+            for (size_t crId = 0; crId < config.creatives.size(); ++crId) {
+                const auto& creative = config.creatives[crId];
+
+                const void * exchangeInfo = getExchangeInfo(state, creative);
+                if (!exchangeInfo) continue;
+
+                bool ret = state.exchange->bidRequestCreativeFilter(
+                        state.request, config, exchangeInfo);
+
+                if (ret) creatives.set(crId, cfgId);
+            }
+        }
+
+        state.narrowAllCreatives(creatives);
+    }
+
+private:
+
+    const void* getExchangeInfo(
+            const FilterState& state, const Creative& creative) const
+    {
+        std::lock_guard<ML::Spinlock> guard(creative.lock);
+        auto it = creative.providerData.find(state.exchange->exchangeName());
+        return it == creative.providerData.end() ? nullptr : it->second.get();
+    }
 };
 
 
