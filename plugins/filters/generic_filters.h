@@ -92,6 +92,38 @@ private:
 template<typename Regex, typename Str>
 struct RegexFilter
 {
+    template<typename List>
+    bool isEmpty(const List& list) const
+    {
+        return list.empty();
+    }
+
+    template<typename List>
+    void addConfig(unsigned configIndex, const List& list)
+    {
+        for (const auto& value : list)
+            addConfig(configIndex, value);
+    }
+
+    template<typename List>
+    void removeConfig(unsigned configIndex, const List& list)
+    {
+        for (const auto& value : list)
+            removeConfig(configIndex, value);
+    }
+
+    ConfigSet filter(const Str& str) const
+    {
+        ConfigSet matches;
+
+        for (const auto& entry : data)
+            matches |= entry.second.filter(str);
+
+        return matches;
+    }
+
+private:
+
     void addConfig(unsigned configIndex, const Regex& regex)
     {
         auto& entry = data[regex.str()];
@@ -103,6 +135,7 @@ struct RegexFilter
     {
         addConfig(configIndex, regex.base);
     }
+
 
     void removeConfig(unsigned configIndex, const Regex& regex)
     {
@@ -117,19 +150,6 @@ struct RegexFilter
     {
         removeConfig(configIndex, regex.base);
     }
-
-
-    ConfigSet filter(const Str& str) const
-    {
-        ConfigSet matches;
-
-        for (const auto& entry : data)
-            matches |= entry.second.filter(str);
-
-        return matches;
-    }
-
-private:
 
     struct RegexData
     {
@@ -148,17 +168,130 @@ private:
 
 
 /******************************************************************************/
+/* LIST FILTER                                                                */
+/******************************************************************************/
+
+template<typename T, typename List = std::vector<T> >
+struct ListFilter
+{
+    bool isEmpty(const List& list) const
+    {
+        return list.empty();
+    }
+
+    void addConfig(unsigned configIndex, const List& list)
+    {
+        setConfig(configIndex, list, true);
+    }
+
+    void removeConfig(unsigned configIndex, const List& list)
+    {
+        setConfig(configIndex, list, false);
+    }
+
+    ConfigSet filter(const T& value) const
+    {
+        auto it = data.find(value);
+        return it == data.end()? ConfigSet() : it->second;
+    }
+
+    ConfigSet filter(const List& list) const
+    {
+        ConfigSet configs;
+
+        for (const auto& entry : list)
+            configs |= data[entry];
+
+        return configs;
+    }
+
+private:
+
+    void setConfig(unsigned configIndex, const List& list, bool value)
+    {
+        for (const auto& entry : list)
+            data[entry].set(configIndex, value);
+    }
+
+    std::unordered_map<T, ConfigSet> data;
+};
+
+
+/******************************************************************************/
+/* SEGMENT LIST FILTER                                                        */
+/******************************************************************************/
+
+/** Segments have quirks and are best handled seperatly from the list filter.
+
+ */
+struct SegmentListFilter
+{
+    bool isEmpty(const SegmentList& segments) const
+    {
+        return segments.empty();
+    }
+
+    void addConfig(unsigned configIndex, const SegmentList& segments)
+    {
+        setConfig(configIndex, segments, true);
+    }
+
+    void removeConfig(unsigned configIndex, const SegmentList& segments)
+    {
+        setConfig(configIndex, segments, false);
+    }
+
+    ConfigSet filter(int i, const std::string& str, float weights) const
+    {
+        return i >= 0 ? get(intSet, i) : get(strSet, str);
+    }
+
+    ConfigSet filter(const SegmentList& segments) const
+    {
+        ConfigSet configs;
+
+        segments.forEach([&](int i, std::string str, float weights) {
+                    configs |= filter(i, str, weights);
+                });
+
+        return configs;
+    }
+
+private:
+
+    void setConfig(unsigned configIndex, const SegmentList& segments, bool value)
+    {
+        segments.forEach([&](int i, std::string str, float weights) {
+                    if (i < 0) intSet[i].set(configIndex, value);
+                    else strSet[str].set(configIndex, value);
+                });
+    }
+
+    template<typename K>
+    ConfigSet get(const std::unordered_map<K, ConfigSet>& m, K k) const
+    {
+        auto it = m.find(k);
+        return it != m.end() ? it->second : ConfigSet();
+    }
+
+    std::unordered_map<int, ConfigSet> intSet;
+    std::unordered_map<std::string, ConfigSet> strSet;
+};
+
+
+/******************************************************************************/
 /* INCLUDE EXCLUDE FILTER                                                     */
 /******************************************************************************/
 
 template<typename Filter>
 struct IncludeExcludeFilter
 {
-
     template<typename... Args>
     void addInclude(unsigned configIndex, Args&&... args)
     {
-        includes.addConfig(configIndex, std::forward<Args>(args)...);
+        if (includes.isEmpty(std::forward<Args>(args)...))
+            emptyIncludes.set(configIndex);
+        else includes.addConfig(configIndex, std::forward<Args>(args)...);
     }
 
     template<typename... Args>
@@ -170,18 +303,17 @@ struct IncludeExcludeFilter
     template<typename T, typename IE = std::vector<T> >
     void addIncludeExclude(unsigned configIndex, const IncludeExclude<T, IE>& ie)
     {
-        for (const auto& value : ie.include)
-            addInclude(configIndex, value);
-
-        for (const auto& value : ie.exclude)
-            addExclude(configIndex, value);
+        addInclude(configIndex, ie.include);
+        addExclude(configIndex, ie.exclude);
     }
 
 
     template<typename... Args>
     void removeInclude(unsigned configIndex, Args&&... args)
     {
-        includes.removeConfig(configIndex, std::forward<Args>(args)...);
+        if (includes.isEmpty(std::forward<Args>(args)...))
+            emptyIncludes.reset(configIndex);
+        else includes.removeConfig(configIndex, std::forward<Args>(args)...);
     }
 
     template<typename... Args>
@@ -193,32 +325,53 @@ struct IncludeExcludeFilter
     template<typename T, typename IE = std::vector<T> >
     void removeIncludeExclude(unsigned configIndex, const IncludeExclude<T, IE>& ie)
     {
-        for (const auto& value : ie.include)
-            removeInclude(configIndex, value);
+        removeInclude(configIndex, ie.include);
+        removeExclude(configIndex, ie.exclude);
+    }
 
-        for (const auto& value : ie.exclude)
-            removeExclude(configIndex, value);
+
+    template<typename... Args>
+    void setInclude(unsigned configIndex, bool value, Args&&... args)
+    {
+        if (value) addInclude(configIndex, std::forward<Args>(args)...);
+        else removeInclude(configIndex, std::forward<Args>(args)...);
+    }
+
+    template<typename... Args>
+    void setExclude(unsigned configIndex, bool value, Args&&... args)
+    {
+        if (value) addExclude(configIndex, std::forward<Args>(args)...);
+        else removeExclude(configIndex, std::forward<Args>(args)...);
+    }
+
+    template<typename... Args>
+    void setIncludeExclude(unsigned configIndex, bool value, Args&&... args)
+    {
+        if (value) addIncludeExclude(configIndex, std::forward<Args>(args)...);
+        else removeIncludeExclude(configIndex, std::forward<Args>(args)...);
     }
 
 
     template<typename... Args>
     ConfigSet filter(Args&&... args) const
     {
-        ConfigSet configs;
+        ConfigSet configs = emptyIncludes;
 
         configs |= includes.filter(std::forward<Args>(args)...);
+
         if (configs.empty()) return configs;
 
         configs &= excludes.filter(std::forward<Args>(args)...).negate();
+
         return configs;
     }
 
 
 private:
+    ConfigSet emptyIncludes;
     Filter includes;
     Filter excludes;
 };
-
 
 
 } // namespace RTBKIT

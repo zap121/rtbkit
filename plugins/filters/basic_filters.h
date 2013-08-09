@@ -27,7 +27,6 @@ namespace RTBKIT {
 
 struct Priority
 {
-    static constexpr unsigned ExchangePre   = 0x000000;
 
     static constexpr unsigned Creative      = 0x010000;
 
@@ -38,6 +37,8 @@ struct Priority
     static constexpr unsigned LanguageRegex = 0x050000;
     static constexpr unsigned LocationRegex = 0x060000;
 
+    static constexpr unsigned ExchangePre   = 0x000000;
+    static constexpr unsigned ExchangeName  = 0x000000;
     static constexpr unsigned ExchangePost  = 0xFF0000;
 };
 
@@ -116,46 +117,16 @@ struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
 
 private:
 
-    struct SegmentInfo
-    {
-        std::unordered_map<int, ConfigSet> intSet;
-        std::unordered_map<std::string, ConfigSet> strSet;
-
-        void set(unsigned configIndex, const SegmentList& segments, bool value);
-
-        template<typename K>
-        ConfigSet get(const std::unordered_map<K, ConfigSet>& m, K k) const
-        {
-            auto it = m.find(k);
-            return it != m.end() ? it->second : ConfigSet();
-        }
-
-        ConfigSet get(int i, std::string str) const
-        {
-            return i >= 0 ? get(intSet, i) : get(strSet, str);
-        }
-    };
-
-    struct SegmentFilter
-    {
-        SegmentInfo include;
-        SegmentInfo exclude;
-        ConfigSet emptyInclude;
-        ConfigSet excludeIfNotPresent;
-
-        void set(
-                unsigned configIndex,
-                const AgentConfig::SegmentInfo& segments,
-                bool value);
-
-        // \todo This is not quite right but will do for now.
-        // Double check with the segment filter test for all the edge cases.
-        ConfigSet filter(const SegmentList& segments) const;
-    };
-
     void setConfig(unsigned configIndex, const AgentConfig& config, bool value);
 
-    std::unordered_map<std::string, SegmentFilter> data;
+    struct SegmentData
+    {
+        IncludeExcludeFilter<SegmentListFilter> ie;
+        ConfigSet emptyInclude;
+        ConfigSet excludeIfNotPresent;
+    };
+
+    std::unordered_map<std::string, SegmentData> data;
     std::unordered_set<std::string> excludeIfNotPresent;
 };
 
@@ -258,7 +229,7 @@ private:
 
 
 /******************************************************************************/
-/* EXCHANGE FILTER                                                            */
+/* EXCHANGE PRE/POST FILTER                                                   */
 /******************************************************************************/
 
 /** The lock makes it next to impossible to do any kind of pre-processing. */
@@ -308,6 +279,38 @@ struct ExchangePostFilter : public IterativeFilter<ExchangePostFilter>
         return state.exchange->bidRequestPostFilter(
                 state.request, config, exchangeInfo);
     }
+};
+
+
+/******************************************************************************/
+/* EXCHANGE NAME FILTER                                                       */
+/******************************************************************************/
+
+struct ExchangeNameFilter : public FilterBaseT<ExchangeNameFilter>
+{
+    static constexpr const char* name = "ExchangeName";
+    unsigned priority() const { return Priority::ExchangeName; }
+
+
+    void addConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        data.addIncludeExclude(configIndex, config->exchangeFilter);
+    }
+
+    void removeConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        data.removeIncludeExclude(configIndex, config->exchangeFilter);
+    }
+
+    void filter(FilterState& state) const
+    {
+        data.filter(state.request.exchange);
+    }
+
+private:
+    IncludeExcludeFilter< ListFilter<std::string> > data;
 };
 
 
@@ -422,62 +425,12 @@ struct CreativeFilter : public FilterBaseT<CreativeFilter>
         setConfig(configIndex, *config, false);
     }
 
-    void filter(FilterState& state) const
-    {
-        ConfigSet configs;
-
-        for (unsigned impId = 0; impId < state.request.imp.size(); ++impId) {
-
-            CreativeMatrix matrix;
-            const AdSpot& imp = state.request.imp[impId];
-
-            for (const auto& format : imp.formats) {
-                auto it = formatFilter.find(makeKey(format));
-                if (it == formatFilter.end()) continue;
-
-                matrix |= it->second;
-            }
-
-
-            if (matrix.empty()) continue;
-            processMatrix(state, matrix, impId);
-            configs |= matrix.aggregate();
-        }
-
-        state.narrowConfigs(configs);
-    }
+    void filter(FilterState& state) const;
 
 private:
 
-    void processMatrix(FilterState& state, CreativeMatrix& matrix, size_t impId) const
-    {
-        std::unordered_map<unsigned, SmallIntVector> biddableCreatives;
-
-        for (unsigned creativeId = 0; creativeId < matrix.size(); ++creativeId) {
-            const auto& configs = matrix[creativeId];
-            if (configs.empty()) continue;
-
-            for (size_t config = configs.next();
-                 config < configs.size();
-                 config = configs.next(config + 1))
-            {
-                biddableCreatives[config].push_back(creativeId);
-            }
-        }
-
-        for (const auto& entry : biddableCreatives)
-            state.addBiddableSpot(entry.first, impId, entry.second);
-    }
-
-    void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
-    {
-        for (size_t i = 0; i < config.creatives.size(); ++i) {
-            const Creative& creative = config.creatives[i];
-
-            auto formatKey = makeKey(creative.format);
-            formatFilter[formatKey].set(i, configIndex, value);
-        }
-    }
+    void processMatrix(FilterState& state, CreativeMatrix& matrix, size_t impId) const;
+    void setConfig(unsigned configIndex, const AgentConfig& config, bool value);
 
     typedef uint32_t FormatKey;
     static_assert(sizeof(FormatKey) == sizeof(Format),

@@ -22,11 +22,16 @@ void
 SegmentsFilter::
 setConfig(unsigned configIndex, const AgentConfig& config, bool value)
 {
-    for (const auto& segment : config.segments) {
-        data[segment.first].set(configIndex, segment.second, value);
+    for (const auto& entry : config.segments) {
+        auto& segment = data[entry.first];
 
-        if (segment.second.excludeIfNotPresent)
-            excludeIfNotPresent.insert(segment.first);
+        segment.ie.setInclude(configIndex, value, entry.second.include);
+        segment.ie.setExclude(configIndex, value, entry.second.exclude);
+
+        if (entry.second.excludeIfNotPresent) {
+            segment.excludeIfNotPresent.set(configIndex, value);
+            excludeIfNotPresent.insert(entry.first);
+        }
     }
 }
 
@@ -42,7 +47,7 @@ filter(FilterState& state) const
         auto it = data.find(segment.first);
         if (it == data.end()) continue;
 
-        state.narrowConfigs(it->second.filter(*segment.second));
+        state.narrowConfigs(it->second.ie.filter(*segment.second));
         if (state.configs().empty()) return;
     }
 
@@ -55,55 +60,72 @@ filter(FilterState& state) const
     }
 }
 
+/******************************************************************************/
+/* CREATIVE FILTER                                                            */
+/******************************************************************************/
 
 void
-SegmentsFilter::SegmentInfo::
-set(unsigned configIndex, const SegmentList& segments, bool value)
+CreativeFilter::
+setConfig(unsigned configIndex, const AgentConfig& config, bool value)
 {
-    segments.forEach([&](int i, string str, float weights) {
-                if (i < 0)
-                    intSet[i].set(configIndex, value);
-                else strSet[str].set(configIndex, value);
-            });
+    for (size_t i = 0; i < config.creatives.size(); ++i) {
+        const Creative& creative = config.creatives[i];
+
+        auto formatKey = makeKey(creative.format);
+        formatFilter[formatKey].set(i, configIndex, value);
+    }
+}
+
+
+void
+CreativeFilter::
+filter(FilterState& state) const
+{
+    ConfigSet configs;
+
+    for (unsigned impId = 0; impId < state.request.imp.size(); ++impId) {
+
+        CreativeMatrix matrix;
+        const AdSpot& imp = state.request.imp[impId];
+
+        for (const auto& format : imp.formats) {
+            auto it = formatFilter.find(makeKey(format));
+            if (it == formatFilter.end()) continue;
+
+            matrix |= it->second;
+        }
+
+
+        if (matrix.empty()) continue;
+        processMatrix(state, matrix, impId);
+        configs |= matrix.aggregate();
+    }
+
+    state.narrowConfigs(configs);
 }
 
 void
-SegmentsFilter::SegmentFilter::
-set(    unsigned configIndex,
-        const AgentConfig::SegmentInfo& segments,
-        bool value)
+CreativeFilter::
+processMatrix(FilterState& state, CreativeMatrix& matrix, size_t impId) const
 {
-    if (segments.include.empty())
-        emptyInclude.set(configIndex);
-    else
-        include.set(configIndex, segments.include, value);
+    std::unordered_map<unsigned, SmallIntVector> biddableCreatives;
 
-    exclude.set(configIndex, segments.exclude, value);
+    for (unsigned creativeId = 0; creativeId < matrix.size(); ++creativeId) {
+        const auto& configs = matrix[creativeId];
+        if (configs.empty()) continue;
 
-    if (segments.excludeIfNotPresent)
-        excludeIfNotPresent.set(configIndex, value);
+        for (size_t config = configs.next();
+             config < configs.size();
+             config = configs.next(config + 1))
+        {
+            biddableCreatives[config].push_back(creativeId);
+        }
+    }
+
+    for (const auto& entry : biddableCreatives)
+        state.addBiddableSpot(entry.first, impId, entry.second);
 }
 
-// \todo This is not quite right but will do for now.
-// Double check with the segment filter test for all the edge cases.
-ConfigSet
-SegmentsFilter::SegmentFilter::
-filter(const SegmentList& segments) const
-{
-    ConfigSet includes = emptyInclude;
-
-    segments.forEach([&](int i, string str, float weights) {
-                includes |= include.get(i, str);
-            });
-
-    if (includes.empty()) return includes;
-
-    segments.forEach([&](int i, string str, float weights) {
-                includes &= exclude.get(i, str).negate();
-            });
-
-    return includes;
-}
 
 } // namespace RTBKIT
 
