@@ -9,6 +9,7 @@
 #pragma once
 
 #include "generic_filters.h"
+#include "priority.h"
 #include "rtbkit/common/exchange_connector.h"
 #include "jml/utils/compact_vector.h"
 
@@ -20,27 +21,6 @@
 
 namespace RTBKIT {
 
-
-/******************************************************************************/
-/* FILTER PRIORITY                                                            */
-/******************************************************************************/
-
-struct Priority
-{
-
-    static constexpr unsigned Creative      = 0x010000;
-
-    static constexpr unsigned HourOfWeek    = 0x020000;
-    static constexpr unsigned Segment       = 0x030000;
-
-    static constexpr unsigned UrlRegex      = 0x040000;
-    static constexpr unsigned LanguageRegex = 0x050000;
-    static constexpr unsigned LocationRegex = 0x060000;
-
-    static constexpr unsigned ExchangePre   = 0x000000;
-    static constexpr unsigned ExchangeName  = 0x000000;
-    static constexpr unsigned ExchangePost  = 0xFF0000;
-};
 
 
 /******************************************************************************/
@@ -311,137 +291,6 @@ struct ExchangeNameFilter : public FilterBaseT<ExchangeNameFilter>
 
 private:
     IncludeExcludeFilter< ListFilter<std::string> > data;
-};
-
-
-/******************************************************************************/
-/* CREATIVE MATRIX                                                            */
-/******************************************************************************/
-
-struct CreativeMatrix
-{
-    CreativeMatrix(bool defaultValue = false) :
-        defaultValue(ConfigSet(defaultValue))
-    {}
-
-    size_t size() const { return matrix.size(); }
-
-    bool empty() const
-    {
-        for (const ConfigSet& set : matrix) {
-            if (!set.empty()) return false;
-        }
-        return true;
-    }
-
-    void expand(size_t newSize)
-    {
-        if (newSize <= matrix.size()) return;
-        matrix.resize(newSize, defaultValue);
-    }
-
-
-    const ConfigSet& operator[] (size_t index) const { return matrix[index]; }
-
-    void set(size_t creative, size_t config, bool value = true)
-    {
-        expand(creative + 1);
-        matrix[creative].set(config, value);
-    }
-
-    void reset(size_t creative, size_t config)
-    {
-        expand(creative + 1);
-        matrix[creative].reset(config);
-    }
-
-#define RTBKIT_CREATIVE_MATRIX_OP(_op_)                                 \
-    CreativeMatrix& operator _op_ (const CreativeMatrix& other)         \
-    {                                                                   \
-        expand(other.matrix.size());                                    \
-                                                                        \
-        for (size_t i = 0; i < other.matrix.size(); ++i)                \
-            matrix[i] _op_ other.matrix[i];                             \
-                                                                        \
-        for (size_t i = other.matrix.size(); i < matrix.size(); ++i)    \
-            matrix[i] _op_ other.defaultValue;                          \
-                                                                        \
-        return *this;                                                   \
-    }
-
-    RTBKIT_CREATIVE_MATRIX_OP(&=)
-    RTBKIT_CREATIVE_MATRIX_OP(|=)
-    RTBKIT_CREATIVE_MATRIX_OP(^=)
-
-#undef RTBKIT_CREATIVE_MATRIX_OP
-
-    CreativeMatrix& negate()
-    {
-        for (ConfigSet& set : matrix) set.negate();
-        return *this;
-    }
-
-    CreativeMatrix negate() const
-    {
-        return CreativeMatrix(*this).negate();
-    }
-
-    ConfigSet aggregate() const
-    {
-        ConfigSet configs;
-
-        for (const ConfigSet& set : matrix)
-            configs |= set;
-
-        return configs;
-    }
-
-
-private:
-    ML::compact_vector<ConfigSet, 8> matrix;
-    ConfigSet defaultValue;
-};
-
-
-/******************************************************************************/
-/* CREATIVE FILTER                                                            */
-/******************************************************************************/
-
-struct CreativeFilter : public FilterBaseT<CreativeFilter>
-{
-    static constexpr const char* name = "Creative";
-    unsigned priority() const { return Priority::Creative; }
-
-
-    void addConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        setConfig(configIndex, *config, true);
-    }
-
-    void removeConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        setConfig(configIndex, *config, false);
-    }
-
-    void filter(FilterState& state) const;
-
-private:
-
-    void processMatrix(FilterState& state, CreativeMatrix& matrix, size_t impId) const;
-    void setConfig(unsigned configIndex, const AgentConfig& config, bool value);
-
-    typedef uint32_t FormatKey;
-    static_assert(sizeof(FormatKey) == sizeof(Format),
-            "Conversion of FormatKey depends on size of Format");
-
-    FormatKey makeKey(const Format& format) const
-    {
-        return uint32_t(format.width << 16 | format.height);
-    }
-
-    std::unordered_map<uint32_t, CreativeMatrix> formatFilter;
 };
 
 

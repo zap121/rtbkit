@@ -76,12 +76,14 @@ filter(const BidRequest& br, const ExchangeConnector* conn)
         if (state.configs().empty()) break;
     }
 
+    auto biddableSpots = state.biddableSpots();
+
     ConfigList configs;
     for (size_t i = state.configs().next();
          i < state.configs().size();
          i = state.configs().next(i + 1))
     {
-        configs.emplace_back(current->configs[i].second, state.biddableSpots(i));
+        configs.emplace_back(current->configs[i].second, biddableSpots[i]);
     }
 
     return configs;

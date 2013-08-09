@@ -166,13 +166,109 @@ private:
 
 
 /******************************************************************************/
+/* CREATIVE MATRIX                                                            */
+/******************************************************************************/
+
+struct CreativeMatrix
+{
+    CreativeMatrix(bool defaultValue = false) :
+        defaultValue(ConfigSet(defaultValue))
+    {}
+
+    CreativeMatrix(ConfigSet defaultValue) :
+        defaultValue(defaultValue)
+    {}
+
+    size_t size() const { return matrix.size(); }
+
+    bool empty() const
+    {
+        for (const ConfigSet& set : matrix) {
+            if (!set.empty()) return false;
+        }
+        return true;
+    }
+
+    void expand(size_t newSize)
+    {
+        if (newSize <= matrix.size()) return;
+        matrix.resize(newSize, defaultValue);
+    }
+
+
+    const ConfigSet& operator[] (size_t index) const { return matrix[index]; }
+
+    void set(size_t creative, size_t config, bool value = true)
+    {
+        expand(creative + 1);
+        matrix[creative].set(config, value);
+    }
+
+    void reset(size_t creative, size_t config)
+    {
+        expand(creative + 1);
+        matrix[creative].reset(config);
+    }
+
+#define RTBKIT_CREATIVE_MATRIX_OP(_op_)                                 \
+    CreativeMatrix& operator _op_ (const CreativeMatrix& other)         \
+    {                                                                   \
+        expand(other.matrix.size());                                    \
+                                                                        \
+        for (size_t i = 0; i < other.matrix.size(); ++i)                \
+            matrix[i] _op_ other.matrix[i];                             \
+                                                                        \
+        for (size_t i = other.matrix.size(); i < matrix.size(); ++i)    \
+            matrix[i] _op_ other.defaultValue;                          \
+                                                                        \
+        return *this;                                                   \
+    }
+
+    RTBKIT_CREATIVE_MATRIX_OP(&=)
+    RTBKIT_CREATIVE_MATRIX_OP(|=)
+    RTBKIT_CREATIVE_MATRIX_OP(^=)
+
+#undef RTBKIT_CREATIVE_MATRIX_OP
+
+    CreativeMatrix& negate()
+    {
+        for (ConfigSet& set : matrix) set.negate();
+        return *this;
+    }
+
+    CreativeMatrix negate() const
+    {
+        return CreativeMatrix(*this).negate();
+    }
+
+    ConfigSet aggregate() const
+    {
+        ConfigSet configs;
+
+        for (const ConfigSet& set : matrix)
+            configs |= set;
+
+        return configs;
+    }
+
+
+private:
+    ML::compact_vector<ConfigSet, 8> matrix;
+    ConfigSet defaultValue;
+};
+
+
+/******************************************************************************/
 /* FILTER STATE                                                               */
 /******************************************************************************/
 
 struct FilterState
 {
     FilterState(const BidRequest& br, const ExchangeConnector* ex, ConfigSet configs) :
-        request(br), exchange(ex), configs_(std::move(configs))
+        request(br),
+        exchange(ex),
+        configs_(std::move(configs)),
+        creatives_()
     {}
 
     const BidRequest& request;
@@ -181,19 +277,62 @@ struct FilterState
     const ConfigSet& configs() const { return configs_; }
     void narrowConfigs(const ConfigSet& mask) { configs_ &= mask; }
 
-    const BiddableSpots& biddableSpots(unsigned configIndex)
+    CreativeMatrix creatives(unsigned impId) const
     {
-        return biddableSpots_[configIndex];
+        CreativeMatrix mask(configs_);
+        if (impId >= creatives_.size()) return mask;
+
+        CreativeMatrix ret = creatives_[impId];
+        ret &= mask;
+        return ret;
     }
-    void addBiddableSpot(
-            unsigned configIndex, unsigned spot, SmallIntVector creatives)
+    void narrowCreatives(unsigned impId, const CreativeMatrix& mask)
     {
-        biddableSpots_[configIndex].emplace_back(spot, creatives);
+        if (impId >= creatives_.size())
+            creatives_.resize(impId + 1, CreativeMatrix(configs_));
+
+        creatives_[impId] &= mask;
+        narrowConfigs(creatives_[impId].aggregate());
+    }
+
+    /** Returns a map of configIndex to BiddableSpots object based on the
+        creative matrix.
+
+        \todo Would be nice if we could remove the temp map in the inner loop.
+     */
+    std::unordered_map<unsigned, BiddableSpots> biddableSpots()
+    {
+        // Used to remove creatives for configs that have been filtered out.
+        CreativeMatrix mask(configs_);
+
+        std::unordered_map<unsigned, BiddableSpots> biddable;
+
+        for (size_t impId = 0; impId < creatives_.size(); ++impId) {
+            std::unordered_map<unsigned, SmallIntVector> biddableCreatives;
+
+            creatives_[impId] &= mask;
+
+            for (unsigned crId = 0; crId < creatives_[impId].size(); ++crId) {
+                const auto& configs = creatives_[impId][crId];
+
+                for (size_t config = configs.next();
+                     config < configs.size();
+                     config = configs.next(config + 1))
+                {
+                    biddableCreatives[config].push_back(crId);
+                }
+            }
+
+            for (const auto& entry : biddableCreatives)
+                biddable[entry.first].emplace_back(impId, entry.second);
+        }
+
+        return biddable;
     }
 
 private:
     ConfigSet configs_;
-    std::unordered_map<unsigned, BiddableSpots> biddableSpots_;
+    ML::compact_vector<CreativeMatrix, 4> creatives_;
 };
 
 

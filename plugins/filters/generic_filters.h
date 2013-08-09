@@ -6,11 +6,11 @@
 
 */
 
+#pragma once
+
 #include "rtbkit/core/agent_configuration/agent_config.h"
 #include "rtbkit/core/agent_configuration/include_exclude.h"
 #include "rtbkit/common/filter.h"
-
-#pragma once
 
 namespace RTBKIT {
 

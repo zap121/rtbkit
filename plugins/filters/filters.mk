@@ -7,7 +7,8 @@
 #------------------------------------------------------------------------------#
 
 LIB_FILTERS_SOURCES := \
-        basic_filters.cc \
+	basic_filters.cc \
+        creative_filters.cc
 
 LIB_FILTERS_LINK := \
 	arch utils filter_registry agent_configuration rtb
