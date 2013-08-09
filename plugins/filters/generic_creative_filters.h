@@ -46,7 +46,7 @@ struct CreativeFilter : public FilterBaseT<Filter>
     }
 
     virtual void filterImpression(
-            FilterState& state, unsigned impId, const AdSpot& imp) const = 0;
+            FilterState& state, unsigned impId, const AdSpot& imp) const {}
 
     void filter(FilterState& state) const
     {

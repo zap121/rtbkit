@@ -49,7 +49,7 @@ struct CreativeFormatFilter : public CreativeFilter<CreativeFormatFilter>
             creatives |= it->second;
         }
 
-        state.narrowCreatives(impIndex, creatives);
+        state.narrowCreativesForImp(impIndex, creatives);
     }
 
 
@@ -89,11 +89,10 @@ struct CreativeLanguageFilter : public CreativeFilter<CreativeLanguageFilter>
         impl.removeIncludeExclude(cfgIndex, crIndex, creative.languageFilter);
     }
 
-    void filterImpression(
-            FilterState& state, unsigned impIndex, const AdSpot& imp) const
+    void filter(FilterState& state) const
     {
-        state.narrowCreatives(
-                impIndex, impl.filter(state.request.language.rawString()));
+        state.narrowAllCreatives(
+                impl.filter(state.request.language.rawString()));
     }
 
 private:
@@ -122,16 +121,48 @@ struct CreativeLocationFilter : public CreativeFilter<CreativeLocationFilter>
         impl.removeIncludeExclude(cfgIndex, crIndex, creative.locationFilter);
     }
 
-    void filterImpression(
-            FilterState& state, unsigned impIndex, const AdSpot& imp) const
+    void filter(FilterState& state) const
     {
-        state.narrowCreatives(
-                impIndex, impl.filter(state.request.location.fullLocationString()));
+        state.narrowAllCreatives(
+                impl.filter(state.request.location.fullLocationString()));
     }
 
 private:
     typedef CreativeRegexFilter<boost::u32regex, Utf8String> BaseFilter;
     CreativeIncludeExcludeFilter<BaseFilter> impl;
+};
+
+
+/******************************************************************************/
+/* CREATIVE EXCHANGE FILTER                                                   */
+/******************************************************************************/
+
+struct CreativeExchangeFilter : public FilterBaseT<CreativeExchangeFilter>
+{
+    static constexpr const char* name = "CreativeExchange";
+    unsigned priority() const { return Priority::CreativeExchange; }
+
+
+    void addCreative(
+            unsigned cfgIndex, unsigned crIndex, const Creative& creative)
+    {
+        impl.addIncludeExclude(cfgIndex, crIndex, creative.languageFilter);
+    }
+
+    void removeCreative(
+            unsigned cfgIndex, unsigned crIndex, const Creative& creative)
+    {
+        impl.removeIncludeExclude(cfgIndex, crIndex, creative.languageFilter);
+    }
+
+
+    void filter(FilterState& state) const
+    {
+        state.narrowAllCreatives(impl.filter(state.request.exchange));
+    }
+
+private:
+    CreativeIncludeExcludeFilter< CreativeListFilter<std::string> > impl;
 };
 
 

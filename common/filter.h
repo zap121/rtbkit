@@ -286,7 +286,8 @@ struct FilterState
         ret &= mask;
         return ret;
     }
-    void narrowCreatives(unsigned impId, const CreativeMatrix& mask)
+
+    void narrowCreativesForImp(unsigned impId, const CreativeMatrix& mask)
     {
         if (impId >= creatives_.size())
             creatives_.resize(impId + 1, CreativeMatrix(configs_));
@@ -294,6 +295,13 @@ struct FilterState
         creatives_[impId] &= mask;
         narrowConfigs(creatives_[impId].aggregate());
     }
+
+    void narrowAllCreatives(const CreativeMatrix& mask)
+    {
+        for (CreativeMatrix& matrix : creatives_)
+            matrix &= mask;
+    }
+
 
     /** Returns a map of configIndex to BiddableSpots object based on the
         creative matrix.

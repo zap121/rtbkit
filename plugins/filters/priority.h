@@ -32,6 +32,7 @@ struct Priority
     static constexpr unsigned CreativeFormat   = 0x000000;
     static constexpr unsigned CreativeLanguage = 0x000000;
     static constexpr unsigned CreativeLocation = 0x000000;
+    static constexpr unsigned CreativeExchange = 0x000000;
 };
 
 
