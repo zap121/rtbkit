@@ -74,11 +74,16 @@ struct InitFilters
 {
     InitFilters()
     {
-        RTBKIT::FilterRegistry::registerFilter<RTBKIT::HourOfWeekFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::SegmentsFilter>();
-        RTBKIT::FilterRegistry::registerFilter<RTBKIT::LanguageRegexFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::FoldPositionFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::HourOfWeekFilter>();
+
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::UrlFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::LanguageFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::LocationFilter>();
 
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::ExchangePreFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::ExchangeNameFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::ExchangePostFilter>();
     }
 

@@ -22,6 +22,49 @@
 namespace RTBKIT {
 
 
+/******************************************************************************/
+/* SEGMENTS FILTER                                                            */
+/******************************************************************************/
+
+/** \todo weights and exchanges.
+    \todo build on top of the IncludeExclude filter.
+
+ */
+struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
+{
+    static constexpr const char* name = "Segments";
+    unsigned priority() const { return Priority::Segments; }
+
+    void addConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        setConfig(configIndex, *config, true);
+    }
+
+    void removeConfig(
+            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        setConfig(configIndex, *config, false);
+    }
+
+    void filter(FilterState& state) const;
+
+
+private:
+
+    void setConfig(unsigned configIndex, const AgentConfig& config, bool value);
+
+    struct SegmentData
+    {
+        IncludeExcludeFilter<SegmentListFilter> ie;
+        ConfigSet emptyInclude;
+        ConfigSet excludeIfNotPresent;
+    };
+
+    std::unordered_map<std::string, SegmentData> data;
+    std::unordered_set<std::string> excludeIfNotPresent;
+};
+
 
 /******************************************************************************/
 /* HOUR OF WEEK FILTER                                                        */
@@ -31,7 +74,7 @@ struct HourOfWeekFilter : public FilterBaseT<HourOfWeekFilter>
 {
     HourOfWeekFilter() { data.fill(ConfigSet()); }
 
-    static constexpr const char* name = "hourOfWeek";
+    static constexpr const char* name = "HourOfWeek";
     unsigned priority() const { return Priority::HourOfWeek; }
 
     void addConfig(
@@ -68,57 +111,13 @@ private:
 
 
 /******************************************************************************/
-/* SEGMENTS FILTER                                                            */
-/******************************************************************************/
-
-/** \todo weights and exchanges.
-    \todo build on top of the IncludeExclude filter.
-
- */
-struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
-{
-    static constexpr const char* name = "segments";
-    unsigned priority() const { return Priority::Segment; }
-
-    void addConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        setConfig(configIndex, *config, true);
-    }
-
-    void removeConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        setConfig(configIndex, *config, false);
-    }
-
-    void filter(FilterState& state) const;
-
-
-private:
-
-    void setConfig(unsigned configIndex, const AgentConfig& config, bool value);
-
-    struct SegmentData
-    {
-        IncludeExcludeFilter<SegmentListFilter> ie;
-        ConfigSet emptyInclude;
-        ConfigSet excludeIfNotPresent;
-    };
-
-    std::unordered_map<std::string, SegmentData> data;
-    std::unordered_set<std::string> excludeIfNotPresent;
-};
-
-
-/******************************************************************************/
 /* URL FILTER                                                                 */
 /******************************************************************************/
 
-struct UrlRegexFilter : public FilterBaseT<UrlRegexFilter>
+struct UrlFilter : public FilterBaseT<UrlFilter>
 {
-    static constexpr const char* name = "UrlRegex";
-    unsigned priority() const { return Priority::UrlRegex; }
+    static constexpr const char* name = "Url";
+    unsigned priority() const { return Priority::Url; }
 
     void addConfig(
             unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
@@ -147,10 +146,10 @@ private:
 /* LANGUAGE FILTER                                                            */
 /******************************************************************************/
 
-struct LanguageRegexFilter : public FilterBaseT<LanguageRegexFilter>
+struct LanguageFilter : public FilterBaseT<LanguageFilter>
 {
-    static constexpr const char* name = "LanguageRegex";
-    unsigned priority() const { return Priority::LanguageRegex; }
+    static constexpr const char* name = "Language";
+    unsigned priority() const { return Priority::Language; }
 
     void addConfig(
             unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
@@ -179,10 +178,10 @@ private:
 /* LOCATION FILTER                                                            */
 /******************************************************************************/
 
-struct LocationRegexFilter : public FilterBaseT<LocationRegexFilter>
+struct LocationFilter : public FilterBaseT<LocationFilter>
 {
-    static constexpr const char* name = "LocationRegex";
-    unsigned priority() const { return Priority::LocationRegex; }
+    static constexpr const char* name = "Location";
+    unsigned priority() const { return Priority::Location; }
 
     void addConfig(
             unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
@@ -291,6 +290,39 @@ struct ExchangeNameFilter : public FilterBaseT<ExchangeNameFilter>
 
 private:
     IncludeExcludeFilter< ListFilter<std::string> > data;
+};
+
+
+/******************************************************************************/
+/* FOLD POSITION FILTER                                                       */
+/******************************************************************************/
+
+struct FoldPositionFilter : public FilterBaseT<FoldPositionFilter>
+{
+    static constexpr const char* name = "FoldPosition";
+    unsigned priority() const { return Priority::FoldPosition; }
+
+    void addConfig(unsigned cfgIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        impl.addIncludeExclude(cfgIndex, config->foldPositionFilter);
+    }
+
+    void removeConfig(
+            unsigned cfgIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        impl.removeIncludeExclude(cfgIndex, config->foldPositionFilter);
+    }
+
+    void filter(FilterState& state) const
+    {
+        for (const auto& imp : state.request.imp) {
+            state.narrowConfigs(impl.filter(imp.position));
+            if (state.configs().empty()) break;
+        }
+    }
+
+private:
+    IncludeExcludeFilter< ListFilter<OpenRTB::AdPosition> > impl;
 };
 
 
