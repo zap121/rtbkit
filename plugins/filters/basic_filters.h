@@ -326,4 +326,55 @@ private:
 };
 
 
+/******************************************************************************/
+/* REQUIRED IDS FILTER                                                        */
+/******************************************************************************/
+
+struct RequiredIdsFilter : public FilterBaseT<RequiredIdsFilter>
+{
+    static constexpr const char* name = "RequireIds";
+    unsigned priority() const { return Priority::RequiredIds; }
+
+    void addConfig(unsigned cfgIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        setConfig(cfgIndex, *config, true);
+    }
+
+    void removeConfig(
+            unsigned cfgIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        setConfig(cfgIndex, *config, false);
+    }
+
+    void filter(FilterState& state) const
+    {
+        std::unordered_set<std::string> missing = required;
+
+        for (const auto& uid : state.request.userIds)
+            missing.erase(uid.first);
+
+        ConfigSet mask;
+        for (const auto& domain : missing) {
+            auto it = domains.find(domain);
+            ExcAssert(it != domains.end());
+            mask |= it->second;
+        }
+
+        state.narrowConfigs(mask);
+    }
+
+private:
+    void setConfig(unsigned cfgIndex, const AgentConfig& config, bool value)
+    {
+        for (const auto& domain : config.requiredIds) {
+            domains[domain].set(cfgIndex, value);
+            required.insert(domain);
+        }
+    }
+
+    std::unordered_map<std::string, ConfigSet> domains;
+    std::unordered_set<std::string> required;
+};
+
+
 } // namespace RTBKIT

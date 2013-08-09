@@ -20,6 +20,7 @@ struct Priority
     static constexpr unsigned Segments             = 0x000000;
     static constexpr unsigned HourOfWeek           = 0x000000;
     static constexpr unsigned FoldPosition         = 0x000000;
+    static constexpr unsigned RequiredIds          = 0x000000;
 
     static constexpr unsigned Url                  = 0x000000;
     static constexpr unsigned Language             = 0x000000;

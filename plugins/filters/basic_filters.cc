@@ -77,6 +77,7 @@ struct InitFilters
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::SegmentsFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::FoldPositionFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::HourOfWeekFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::RequiredIdsFilter>();
 
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::UrlFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::LanguageFilter>();
