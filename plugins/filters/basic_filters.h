@@ -27,7 +27,6 @@ namespace RTBKIT {
 /******************************************************************************/
 
 /** \todo weights and exchanges.
-    \todo build on top of the IncludeExclude filter.
 
  */
 struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
@@ -57,7 +56,6 @@ private:
     struct SegmentData
     {
         IncludeExcludeFilter<SegmentListFilter> ie;
-        ConfigSet emptyInclude;
         ConfigSet excludeIfNotPresent;
     };
 
