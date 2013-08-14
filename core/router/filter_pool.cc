@@ -66,7 +66,7 @@ FilterPool::ConfigList
 FilterPool::
 filter(const BidRequest& br, const ExchangeConnector* conn)
 {
-    GcLockBase::SharedGuard guard(gc, false);
+    GcLockBase::SharedGuard guard(gc, GcLockBase::RD_NO);
 
     Data* current = data.load();
     FilterState state(br, conn, current->activeConfigs);
