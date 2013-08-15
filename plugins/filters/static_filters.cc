@@ -6,8 +6,7 @@
 
 */
 
-#include "basic_filters.h"
-
+#include "static_filters.h"
 
 // User partition filter.
 #define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1

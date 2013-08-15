@@ -7,7 +7,7 @@
 #------------------------------------------------------------------------------#
 
 LIB_FILTERS_SOURCES := \
-	basic_filters.cc \
+	static_filters.cc \
         creative_filters.cc
 
 LIB_FILTERS_LINK := \
