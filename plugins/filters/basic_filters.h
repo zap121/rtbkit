@@ -35,7 +35,6 @@ struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
     unsigned priority() const { return Priority::Segments; }
 
     void setConfig(unsigned configIndex, const AgentConfig& config, bool value);
-
     void filter(FilterState& state) const;
 
 private:
@@ -48,6 +47,44 @@ private:
 
     std::unordered_map<std::string, SegmentData> data;
     std::unordered_set<std::string> excludeIfNotPresent;
+};
+
+
+/******************************************************************************/
+/* USER PARTITION FILTER                                                      */
+/******************************************************************************/
+
+struct UserPartitionFilter : public FilterBaseT<UserPartitionFilter>
+{
+    static constexpr const char* name = "UserPartition";
+    unsigned priority() const { return Priority::UserPartition; }
+
+    void setConfig(unsigned cfgIndex, const AgentConfig& config, bool value);
+    void filter(FilterState& state) const;
+
+private:
+
+    struct FilterEntry
+    {
+        FilterEntry() : hashOn(UserPartition::NONE) {}
+
+        IntervalFilter<int> filter;
+        ConfigSet excludeIfEmpty;
+        int modulus;
+        UserPartition::HashOn hashOn;
+    };
+
+    ConfigSet defaultSet;
+    std::unordered_map<uint64_t, FilterEntry> data;
+
+    uint64_t getKey(const UserPartition& obj) const
+    {
+        return uint64_t(obj.modulus) << 32 | uint64_t(obj.hashOn);
+    }
+
+    std::pair<bool, uint64_t>
+    getValue(const BidRequest& br, const FilterEntry& entry) const;
+
 };
 
 
@@ -92,16 +129,9 @@ struct UrlFilter : public FilterBaseT<UrlFilter>
     static constexpr const char* name = "Url";
     unsigned priority() const { return Priority::Url; }
 
-    void addConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
     {
-        impl.addIncludeExclude(configIndex, config->urlFilter);
-    }
-
-    void removeConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        impl.removeIncludeExclude(configIndex, config->urlFilter);
+        impl.setIncludeExclude(configIndex, value, config.urlFilter);
     }
 
     void filter(FilterState& state) const
@@ -116,6 +146,30 @@ private:
 
 
 /******************************************************************************/
+/* HOST FILTER                                                                */
+/******************************************************************************/
+
+struct HostFilter : public FilterBaseT<HostFilter>
+{
+    static constexpr const char* name = "Host";
+    unsigned priority() const { return Priority::Host; }
+
+    void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
+    {
+        impl.setIncludeExclude(configIndex, value, config.hostFilter);
+    }
+
+    void filter(FilterState& state) const
+    {
+        impl.filter(state.request.url);
+    }
+
+private:
+    IncludeExcludeFilter< DomainFilter<std::string> > impl;
+};
+
+
+/******************************************************************************/
 /* LANGUAGE FILTER                                                            */
 /******************************************************************************/
 
@@ -124,16 +178,9 @@ struct LanguageFilter : public FilterBaseT<LanguageFilter>
     static constexpr const char* name = "Language";
     unsigned priority() const { return Priority::Language; }
 
-    void addConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
     {
-        impl.addIncludeExclude(configIndex, config->languageFilter);
-    }
-
-    void removeConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        impl.removeIncludeExclude(configIndex, config->languageFilter);
+        impl.setIncludeExclude(configIndex, value, config.languageFilter);
     }
 
     void filter(FilterState& state) const
@@ -156,16 +203,9 @@ struct LocationFilter : public FilterBaseT<LocationFilter>
     static constexpr const char* name = "Location";
     unsigned priority() const { return Priority::Location; }
 
-    void addConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
     {
-        impl.addIncludeExclude(configIndex, config->locationFilter);
-    }
-
-    void removeConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        impl.removeIncludeExclude(configIndex, config->locationFilter);
+        impl.setIncludeExclude(configIndex, value, config.locationFilter);
     }
 
     void filter(FilterState& state) const
@@ -244,16 +284,9 @@ struct ExchangeNameFilter : public FilterBaseT<ExchangeNameFilter>
     unsigned priority() const { return Priority::ExchangeName; }
 
 
-    void addConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
     {
-        data.addIncludeExclude(configIndex, config->exchangeFilter);
-    }
-
-    void removeConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        data.removeIncludeExclude(configIndex, config->exchangeFilter);
+        data.setIncludeExclude(configIndex, value, config.exchangeFilter);
     }
 
     void filter(FilterState& state) const
@@ -275,15 +308,9 @@ struct FoldPositionFilter : public FilterBaseT<FoldPositionFilter>
     static constexpr const char* name = "FoldPosition";
     unsigned priority() const { return Priority::FoldPosition; }
 
-    void addConfig(unsigned cfgIndex, const std::shared_ptr<AgentConfig>& config)
+    void setConfig(unsigned cfgIndex, const AgentConfig& config, bool value)
     {
-        impl.addIncludeExclude(cfgIndex, config->foldPositionFilter);
-    }
-
-    void removeConfig(
-            unsigned cfgIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        impl.removeIncludeExclude(cfgIndex, config->foldPositionFilter);
+        impl.setIncludeExclude(cfgIndex, value, config.foldPositionFilter);
     }
 
     void filter(FilterState& state) const
@@ -337,44 +364,6 @@ private:
 
     std::unordered_map<std::string, ConfigSet> domains;
     std::unordered_set<std::string> required;
-};
-
-
-/******************************************************************************/
-/* USER PARTITION FILTER                                                      */
-/******************************************************************************/
-
-struct UserPartitionFilter : public FilterBaseT<UserPartitionFilter>
-{
-    static constexpr const char* name = "UserPartition";
-    unsigned priority() const { return Priority::UserPartition; }
-
-    void setConfig(unsigned cfgIndex, const AgentConfig& config, bool value);
-    void filter(FilterState& state) const;
-
-private:
-
-    struct FilterEntry
-    {
-        FilterEntry() : hashOn(UserPartition::NONE) {}
-
-        IntervalFilter<int> filter;
-        ConfigSet excludeIfEmpty;
-        int modulus;
-        UserPartition::HashOn hashOn;
-    };
-
-    ConfigSet defaultSet;
-    std::unordered_map<uint64_t, FilterEntry> data;
-
-    uint64_t getKey(const UserPartition& obj) const
-    {
-        return uint64_t(obj.modulus) << 32 | uint64_t(obj.hashOn);
-    }
-
-    std::pair<bool, uint64_t>
-    getValue(const BidRequest& br, const FilterEntry& entry) const;
-
 };
 
 } // namespace RTBKIT

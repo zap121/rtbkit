@@ -218,6 +218,90 @@ private:
 
 
 /******************************************************************************/
+/* DOMAIN FILTER                                                              */
+/******************************************************************************/
+
+template<typename Str>
+struct DomainFilter
+{
+    template<typename List>
+    bool isEmpty(const List& list) const
+    {
+        return list.empty();
+    }
+
+    template<typename List>
+    void addConfig(unsigned cfgIndex, const List& list)
+    {
+        for (const auto& value : list)
+            addConfig(cfgIndex, value);
+    }
+
+    template<typename List>
+    void removeConfig(unsigned cfgIndex, const List& list)
+    {
+        for (const auto& value : list)
+            removeConfig(cfgIndex, value);
+    }
+
+    ConfigSet filter(const Url& host) const
+    {
+        ConfigSet matches;
+
+        for (const auto& key : getKeys(host)) {
+            auto it = domainMap.find(key);
+            if (it == domainMap.end()) continue;
+
+            matches |= it->second;
+        }
+
+        return matches;
+    }
+
+private:
+
+    void addConfig(unsigned cfgIndex, const DomainMatcher& matcher)
+    {
+        ExcAssert(matcher.isLiteral);
+        addConfig(cfgIndex, matcher.str);
+    }
+
+    void removeConfig(unsigned cfgIndex, const DomainMatcher& matcher)
+    {
+        ExcAssert(matcher.isLiteral);
+        removeConfig(cfgIndex, matcher.str);
+    }
+
+    void addConfig(unsigned cfgIndex, const Str& host)
+    {
+        domainMap[host].set(cfgIndex);
+    }
+
+    void removeConfig(unsigned cfgIndex, const Str& host)
+    {
+        domainMap[host].reset(cfgIndex);
+    }
+
+    std::vector<std::string> getKeys(const Url& host) const
+    {
+        std::vector<std::string> keys;
+
+        std::string domain = host.host();
+        while (true) {
+            keys.push_back(domain);
+
+            size_t pos = domain.find('.');
+            if (pos == std::string::npos) break;
+            domain = domain.substr(pos+1);
+        }
+
+        return keys;
+    }
+
+    std::unordered_map<std::string, ConfigSet> domainMap;
+};
+
+/******************************************************************************/
 /* REGEX FILTER                                                               */
 /******************************************************************************/
 

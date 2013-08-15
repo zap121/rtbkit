@@ -181,6 +181,7 @@ struct InitFilters
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::UserPartitionFilter>();
 
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::UrlFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::HostFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::LanguageFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::LocationFilter>();
 

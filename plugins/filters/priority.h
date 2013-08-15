@@ -24,6 +24,7 @@ struct Priority
     static constexpr unsigned UserPartition        = 0x000000;
 
     static constexpr unsigned Url                  = 0x000000;
+    static constexpr unsigned Host                 = 0x000000;
     static constexpr unsigned Language             = 0x000000;
     static constexpr unsigned Location             = 0x000000;
 
