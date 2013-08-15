@@ -34,24 +34,11 @@ struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
     static constexpr const char* name = "Segments";
     unsigned priority() const { return Priority::Segments; }
 
-    void addConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        setConfig(configIndex, *config, true);
-    }
-
-    void removeConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        setConfig(configIndex, *config, false);
-    }
+    void setConfig(unsigned configIndex, const AgentConfig& config, bool value);
 
     void filter(FilterState& state) const;
 
-
 private:
-
-    void setConfig(unsigned configIndex, const AgentConfig& config, bool value);
 
     struct SegmentData
     {
@@ -75,16 +62,13 @@ struct HourOfWeekFilter : public FilterBaseT<HourOfWeekFilter>
     static constexpr const char* name = "HourOfWeek";
     unsigned priority() const { return Priority::HourOfWeek; }
 
-    void addConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
+    void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
     {
-        setConfig(configIndex, *config, true);
-    }
-
-    void removeConfig(
-            unsigned configIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        setConfig(configIndex, *config, false);
+        const auto& bitmap = config.hourOfWeekFilter.hourBitmap;
+        for (size_t i = 0; i < bitmap.size(); ++i) {
+            if (!bitmap[i]) continue;
+            data[i].set(configIndex, value);
+        }
     }
 
     void filter(FilterState& state) const
@@ -94,15 +78,6 @@ struct HourOfWeekFilter : public FilterBaseT<HourOfWeekFilter>
     }
 
 private:
-
-    void setConfig(unsigned configIndex, const AgentConfig& config, bool value)
-    {
-        const auto& bitmap = config.hourOfWeekFilter.hourBitmap;
-        for (size_t i = 0; i < bitmap.size(); ++i) {
-            if (!bitmap[i]) continue;
-            data[i].set(configIndex, value);
-        }
-    }
 
     std::array<ConfigSet, 24 * 7> data;
 };
@@ -333,15 +308,12 @@ struct RequiredIdsFilter : public FilterBaseT<RequiredIdsFilter>
     static constexpr const char* name = "RequireIds";
     unsigned priority() const { return Priority::RequiredIds; }
 
-    void addConfig(unsigned cfgIndex, const std::shared_ptr<AgentConfig>& config)
+    void setConfig(unsigned cfgIndex, const AgentConfig& config, bool value)
     {
-        setConfig(cfgIndex, *config, true);
-    }
-
-    void removeConfig(
-            unsigned cfgIndex, const std::shared_ptr<AgentConfig>& config)
-    {
-        setConfig(cfgIndex, *config, false);
+        for (const auto& domain : config.requiredIds) {
+            domains[domain].set(cfgIndex, value);
+            required.insert(domain);
+        }
     }
 
     void filter(FilterState& state) const
@@ -362,17 +334,9 @@ struct RequiredIdsFilter : public FilterBaseT<RequiredIdsFilter>
     }
 
 private:
-    void setConfig(unsigned cfgIndex, const AgentConfig& config, bool value)
-    {
-        for (const auto& domain : config.requiredIds) {
-            domains[domain].set(cfgIndex, value);
-            required.insert(domain);
-        }
-    }
 
     std::unordered_map<std::string, ConfigSet> domains;
     std::unordered_set<std::string> required;
 };
-
 
 } // namespace RTBKIT

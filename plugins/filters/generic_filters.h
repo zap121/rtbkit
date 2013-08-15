@@ -28,6 +28,23 @@ struct FilterBaseT : public FilterBase
     {
         return new Filter(*static_cast<const Filter*>(this));
     }
+
+    void addConfig(unsigned cfgIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        setConfig(cfgIndex, *config, true);
+    }
+
+    void removeConfig(
+            unsigned cfgIndex, const std::shared_ptr<AgentConfig>& config)
+    {
+        setConfig(cfgIndex, *config, false);
+    }
+
+    virtual void setConfig(unsigned cfgIndex, const AgentConfig& config, bool value)
+    {
+        ExcAssert(false);
+    }
+
 };
 
 
