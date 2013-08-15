@@ -339,4 +339,42 @@ private:
     std::unordered_set<std::string> required;
 };
 
+
+/******************************************************************************/
+/* USER PARTITION FILTER                                                      */
+/******************************************************************************/
+
+struct UserPartitionFilter : public FilterBaseT<UserPartitionFilter>
+{
+    static constexpr const char* name = "UserPartition";
+    unsigned priority() const { return Priority::UserPartition; }
+
+    void setConfig(unsigned cfgIndex, const AgentConfig& config, bool value);
+    void filter(FilterState& state) const;
+
+private:
+
+    struct FilterEntry
+    {
+        FilterEntry() : hashOn(UserPartition::NONE) {}
+
+        IntervalFilter<int> filter;
+        ConfigSet excludeIfEmpty;
+        int modulus;
+        UserPartition::HashOn hashOn;
+    };
+
+    ConfigSet defaultSet;
+    std::unordered_map<uint64_t, FilterEntry> data;
+
+    uint64_t getKey(const UserPartition& obj) const
+    {
+        return uint64_t(obj.modulus) << 32 | uint64_t(obj.hashOn);
+    }
+
+    std::pair<bool, uint64_t>
+    getValue(const BidRequest& br, const FilterEntry& entry) const;
+
+};
+
 } // namespace RTBKIT

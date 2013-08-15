@@ -9,6 +9,11 @@
 #include "basic_filters.h"
 
 
+// User partition filter.
+#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
+#include "crypto++/md5.h"
+
+
 using namespace std;
 using namespace ML;
 
@@ -20,16 +25,16 @@ namespace RTBKIT {
 
 void
 SegmentsFilter::
-setConfig(unsigned configIndex, const AgentConfig& config, bool value)
+setConfig(unsigned cfgIndex, const AgentConfig& config, bool value)
 {
     for (const auto& entry : config.segments) {
         auto& segment = data[entry.first];
 
-        segment.ie.setInclude(configIndex, value, entry.second.include);
-        segment.ie.setExclude(configIndex, value, entry.second.exclude);
+        segment.ie.setInclude(cfgIndex, value, entry.second.include);
+        segment.ie.setExclude(cfgIndex, value, entry.second.exclude);
 
         if (entry.second.excludeIfNotPresent) {
-            segment.excludeIfNotPresent.set(configIndex, value);
+            segment.excludeIfNotPresent.set(cfgIndex, value);
             excludeIfNotPresent.insert(entry.first);
         }
     }
@@ -61,6 +66,101 @@ filter(FilterState& state) const
 }
 
 
+/******************************************************************************/
+/* USER PARTITION FILTER                                                      */
+/******************************************************************************/
+
+void
+UserPartitionFilter::
+setConfig(unsigned cfgIndex, const AgentConfig& config, bool value)
+{
+    const auto& part = config.userPartition;
+
+    if (part.hashOn == UserPartition::NONE) {
+        defaultSet.set(cfgIndex, value);
+        return;
+    }
+
+    auto& entry = data[getKey(part)];
+    if (entry.hashOn == UserPartition::NONE) {
+        entry.modulus = part.modulus;
+        entry.hashOn = part.hashOn;
+    }
+    ExcAssertEqual(entry.modulus, part.modulus);
+    ExcAssertEqual(entry.hashOn, part.hashOn);
+
+    entry.excludeIfEmpty.set(cfgIndex);
+
+    if (value) entry.filter.addConfig(cfgIndex, part.includeRanges);
+    else entry.filter.removeConfig(cfgIndex, part.includeRanges);
+}
+
+void
+UserPartitionFilter::
+filter(FilterState& state) const
+{
+    ConfigSet matches = defaultSet;
+    ConfigSet excludes;
+
+    for (const auto& entry : data) {
+        auto value = getValue(state.request, entry.second);
+
+        if (!value.first) excludes |= entry.second.excludeIfEmpty;
+        else matches |= entry.second.filter.filter(value.second);
+    }
+
+    matches &= excludes.negate();
+    state.narrowConfigs(matches);
+}
+
+namespace {
+
+// \todo Currently uses MD5 which is suboptimal.
+uint64_t calcHash(const std::string& str)
+{
+    CryptoPP::Weak::MD5 md5;
+
+    union {
+        uint64_t result;
+        byte bytes[sizeof(uint64_t)];
+    };
+
+    md5.CalculateTruncatedDigest(bytes, sizeof(uint64_t),
+            (const byte *)str.c_str(), str.size());
+
+    return result;
+}
+
+} // namespace anonymous
+
+std::pair<bool, uint64_t>
+UserPartitionFilter::
+getValue(const BidRequest& br, const FilterEntry& entry) const
+{
+    if (entry.hashOn == UserPartition::RANDOM)
+        return make_pair(true, random() % entry.modulus);
+
+    string str;
+
+    switch (entry.hashOn) {
+    case UserPartition::EXCHANGEID:
+        str = br.userIds.exchangeId.toString(); break;
+
+    case UserPartition::PROVIDERID:
+        str = br.userIds.providerId.toString(); break;
+
+    case UserPartition::IPUA:
+        str = br.ipAddress + br.userAgent.rawString(); break;
+
+    default: ExcAssert(false);
+    };
+
+    if (str.empty() || str == "null") return make_pair(false, 0);
+
+    return make_pair(true, calcHash(str) % entry.modulus);
+}
+
+
 } // namespace RTBKIT
 
 
@@ -78,6 +178,7 @@ struct InitFilters
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::FoldPositionFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::HourOfWeekFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::RequiredIdsFilter>();
+        RTBKIT::FilterRegistry::registerFilter<RTBKIT::UserPartitionFilter>();
 
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::UrlFilter>();
         RTBKIT::FilterRegistry::registerFilter<RTBKIT::LanguageFilter>();

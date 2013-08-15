@@ -12,6 +12,8 @@
 #include "rtbkit/core/agent_configuration/include_exclude.h"
 #include "rtbkit/common/filter.h"
 
+#include <boost/range/adaptor/reversed.hpp>
+
 namespace RTBKIT {
 
 
@@ -49,7 +51,7 @@ struct FilterBaseT : public FilterBase
 
 
 /******************************************************************************/
-/* CONFIG FILTER                                                              */
+/* ITERATIVE FILTER                                                           */
 /******************************************************************************/
 
 /** These filters are discouraged because they do not scale well. */
@@ -57,20 +59,20 @@ template<typename Filter>
 struct IterativeFilter : public FilterBaseT<Filter>
 {
     virtual void addConfig(
-            unsigned configIndex,
+            unsigned cfgIndex,
             const std::shared_ptr<AgentConfig>& config)
     {
-        if (configIndex >= configs.size())
-            configs.resize(configIndex + 1);
+        if (cfgIndex >= configs.size())
+            configs.resize(cfgIndex + 1);
 
-        configs[configIndex] = config;
+        configs[cfgIndex] = config;
     }
 
     virtual void removeConfig(
-            unsigned configIndex,
+            unsigned cfgIndex,
             const std::shared_ptr<AgentConfig>& config)
     {
-        configs[configIndex].reset();
+        configs[cfgIndex].reset();
     }
 
     virtual void filter(FilterState& state) const
@@ -102,6 +104,120 @@ protected:
 
 
 /******************************************************************************/
+/* INTERVAL FILTER                                                            */
+/******************************************************************************/
+
+template<typename T>
+struct IntervalFilter
+{
+    template<typename List>
+    bool isEmpty(const List& list) const
+    {
+        return list.empty();
+    }
+
+    template<typename List>
+    void addConfig(unsigned cfgIndex, const List& list)
+    {
+        for (const auto& value : list)
+            addConfig(cfgIndex, value);
+    }
+
+    template<typename List>
+    void removeConfig(unsigned cfgIndex, const List& list)
+    {
+        for (const auto& value : list)
+            removeConfig(cfgIndex, value);
+    }
+
+    ConfigSet filter(const T& value) const
+    {
+        ConfigSet matches;
+
+        for (const auto& ub : upperBounds) {
+            if (value >= ub.first) break;
+            matches |= ub.second;
+        }
+
+        for (const auto& lb : lowerBounds) {
+            if (value >= lb.first) break;
+            matches &= lb.second.negate();
+        }
+
+        return matches;
+    }
+
+private:
+
+    void addConfig(unsigned cfgIndex, const std::pair<T, T>& interval)
+    {
+        insertBound(cfgIndex, lowerBounds, interval.first);
+        insertBound(cfgIndex, upperBounds, interval.second);
+    }
+
+    void removeConfig(unsigned cfgIndex, const std::pair<T, T>& interval)
+    {
+        removeBound(cfgIndex, lowerBounds, interval.first);
+        removeBound(cfgIndex, upperBounds, interval.second);
+    }
+
+    void addConfig(unsigned cfgIndex, const UserPartition::Interval& interval)
+    {
+        insertBound(cfgIndex, lowerBounds, interval.first);
+        insertBound(cfgIndex, upperBounds, interval.last);
+    }
+
+    void removeConfig(unsigned cfgIndex, const UserPartition::Interval& interval)
+    {
+        removeBound(cfgIndex, lowerBounds, interval.first);
+        removeBound(cfgIndex, upperBounds, interval.last);
+    }
+
+
+    typedef std::vector< std::pair<T, ConfigSet> > BoundList;
+
+    void insertBound(unsigned cfgIndex, BoundList& list, T bound)
+    {
+        ssize_t index = findBound(list, bound);
+
+        if (index < 0) {
+            index = list.size();
+            list.emplace_back(bound, ConfigSet());
+        }
+
+        if (list[index].first != bound)
+            list.insert(list.begin() + index, make_pair(bound, ConfigSet()));
+
+        ExcAssertEqual(list[index].first, bound);
+
+        list[index].second.set(cfgIndex);
+    }
+
+    void removeBound(unsigned cfgIndex, BoundList& list, T bound)
+    {
+        ssize_t index = findBound(list, bound);
+        if (index < 0 || list[index].first != bound) return;
+
+        list[index].second.reset(cfgIndex);
+        if (!list[index].second.empty()) return;
+
+        list.erase(list.begin() + index);
+    }
+
+    ssize_t findBound(const BoundList& list, T bound)
+    {
+        for (size_t i = 0; i < list.size(); ++i) {
+            if (list[i].first >= bound) return i;
+        }
+        return -1;
+    }
+
+    BoundList lowerBounds;
+    BoundList upperBounds;
+};
+
+
+/******************************************************************************/
 /* REGEX FILTER                                                               */
 /******************************************************************************/
 
@@ -120,17 +236,17 @@ struct RegexFilter
     }
 
     template<typename List>
-    void addConfig(unsigned configIndex, const List& list)
+    void addConfig(unsigned cfgIndex, const List& list)
     {
         for (const auto& value : list)
-            addConfig(configIndex, value);
+            addConfig(cfgIndex, value);
     }
 
     template<typename List>
-    void removeConfig(unsigned configIndex, const List& list)
+    void removeConfig(unsigned cfgIndex, const List& list)
     {
         for (const auto& value : list)
-            removeConfig(configIndex, value);
+            removeConfig(cfgIndex, value);
     }
 
     ConfigSet filter(const Str& str) const
@@ -145,31 +261,31 @@ struct RegexFilter
 
 private:
 
-    void addConfig(unsigned configIndex, const Regex& regex)
+    void addConfig(unsigned cfgIndex, const Regex& regex)
     {
         auto& entry = data[regex.str()];
         if (entry.regex.empty()) entry.regex = regex;
-        entry.configs.set(configIndex);
+        entry.configs.set(cfgIndex);
     }
 
-    void addConfig(unsigned configIndex, const CachedRegex<Regex, Str>& regex)
+    void addConfig(unsigned cfgIndex, const CachedRegex<Regex, Str>& regex)
     {
-        addConfig(configIndex, regex.base);
+        addConfig(cfgIndex, regex.base);
     }
 
 
-    void removeConfig(unsigned configIndex, const Regex& regex)
+    void removeConfig(unsigned cfgIndex, const Regex& regex)
     {
         auto it = data.find(regex.str());
         if (it == data.end()) return;
 
-        it->second.configs.reset(configIndex);
+        it->second.configs.reset(cfgIndex);
         if (it->second.configs.empty()) data.erase(it);
     }
 
-    void removeConfig(unsigned configIndex, const CachedRegex<Regex, Str>& regex)
+    void removeConfig(unsigned cfgIndex, const CachedRegex<Regex, Str>& regex)
     {
-        removeConfig(configIndex, regex.base);
+        removeConfig(cfgIndex, regex.base);
     }
 
     struct RegexData
@@ -200,14 +316,14 @@ struct ListFilter
         return list.empty();
     }
 
-    void addConfig(unsigned configIndex, const List& list)
+    void addConfig(unsigned cfgIndex, const List& list)
     {
-        setConfig(configIndex, list, true);
+        setConfig(cfgIndex, list, true);
     }
 
-    void removeConfig(unsigned configIndex, const List& list)
+    void removeConfig(unsigned cfgIndex, const List& list)
     {
-        setConfig(configIndex, list, false);
+        setConfig(cfgIndex, list, false);
     }
 
     ConfigSet filter(const T& value) const
@@ -228,10 +344,10 @@ struct ListFilter
 
 private:
 
-    void setConfig(unsigned configIndex, const List& list, bool value)
+    void setConfig(unsigned cfgIndex, const List& list, bool value)
     {
         for (const auto& entry : list)
-            data[entry].set(configIndex, value);
+            data[entry].set(cfgIndex, value);
     }
 
     std::unordered_map<T, ConfigSet> data;
@@ -252,14 +368,14 @@ struct SegmentListFilter
         return segments.empty();
     }
 
-    void addConfig(unsigned configIndex, const SegmentList& segments)
+    void addConfig(unsigned cfgIndex, const SegmentList& segments)
     {
-        setConfig(configIndex, segments, true);
+        setConfig(cfgIndex, segments, true);
     }
 
-    void removeConfig(unsigned configIndex, const SegmentList& segments)
+    void removeConfig(unsigned cfgIndex, const SegmentList& segments)
     {
-        setConfig(configIndex, segments, false);
+        setConfig(cfgIndex, segments, false);
     }
 
     ConfigSet filter(int i, const std::string& str, float weights) const
@@ -280,11 +396,11 @@ struct SegmentListFilter
 
 private:
 
-    void setConfig(unsigned configIndex, const SegmentList& segments, bool value)
+    void setConfig(unsigned cfgIndex, const SegmentList& segments, bool value)
     {
         segments.forEach([&](int i, std::string str, float weights) {
-                    if (i < 0) intSet[i].set(configIndex, value);
-                    else strSet[str].set(configIndex, value);
+                    if (i < 0) intSet[i].set(cfgIndex, value);
+                    else strSet[str].set(cfgIndex, value);
                 });
     }
 
@@ -308,68 +424,68 @@ template<typename Filter>
 struct IncludeExcludeFilter
 {
     template<typename... Args>
-    void addInclude(unsigned configIndex, Args&&... args)
+    void addInclude(unsigned cfgIndex, Args&&... args)
     {
         if (includes.isEmpty(std::forward<Args>(args)...))
-            emptyIncludes.set(configIndex);
-        else includes.addConfig(configIndex, std::forward<Args>(args)...);
+            emptyIncludes.set(cfgIndex);
+        else includes.addConfig(cfgIndex, std::forward<Args>(args)...);
     }
 
     template<typename... Args>
-    void addExclude(unsigned configIndex, Args&&... args)
+    void addExclude(unsigned cfgIndex, Args&&... args)
     {
-        excludes.addConfig(configIndex, std::forward<Args>(args)...);
+        excludes.addConfig(cfgIndex, std::forward<Args>(args)...);
     }
 
     template<typename T, typename IE = std::vector<T> >
-    void addIncludeExclude(unsigned configIndex, const IncludeExclude<T, IE>& ie)
+    void addIncludeExclude(unsigned cfgIndex, const IncludeExclude<T, IE>& ie)
     {
-        addInclude(configIndex, ie.include);
-        addExclude(configIndex, ie.exclude);
+        addInclude(cfgIndex, ie.include);
+        addExclude(cfgIndex, ie.exclude);
     }
 
 
     template<typename... Args>
-    void removeInclude(unsigned configIndex, Args&&... args)
+    void removeInclude(unsigned cfgIndex, Args&&... args)
     {
         if (includes.isEmpty(std::forward<Args>(args)...))
-            emptyIncludes.reset(configIndex);
-        else includes.removeConfig(configIndex, std::forward<Args>(args)...);
+            emptyIncludes.reset(cfgIndex);
+        else includes.removeConfig(cfgIndex, std::forward<Args>(args)...);
     }
 
     template<typename... Args>
-    void removeExclude(unsigned configIndex, Args&&... args)
+    void removeExclude(unsigned cfgIndex, Args&&... args)
     {
-        excludes.removeConfig(configIndex, std::forward<Args>(args)...);
+        excludes.removeConfig(cfgIndex, std::forward<Args>(args)...);
     }
 
     template<typename T, typename IE = std::vector<T> >
-    void removeIncludeExclude(unsigned configIndex, const IncludeExclude<T, IE>& ie)
+    void removeIncludeExclude(unsigned cfgIndex, const IncludeExclude<T, IE>& ie)
     {
-        removeInclude(configIndex, ie.include);
-        removeExclude(configIndex, ie.exclude);
+        removeInclude(cfgIndex, ie.include);
+        removeExclude(cfgIndex, ie.exclude);
     }
 
 
     template<typename... Args>
-    void setInclude(unsigned configIndex, bool value, Args&&... args)
+    void setInclude(unsigned cfgIndex, bool value, Args&&... args)
     {
-        if (value) addInclude(configIndex, std::forward<Args>(args)...);
-        else removeInclude(configIndex, std::forward<Args>(args)...);
+        if (value) addInclude(cfgIndex, std::forward<Args>(args)...);
+        else removeInclude(cfgIndex, std::forward<Args>(args)...);
     }
 
     template<typename... Args>
-    void setExclude(unsigned configIndex, bool value, Args&&... args)
+    void setExclude(unsigned cfgIndex, bool value, Args&&... args)
     {
-        if (value) addExclude(configIndex, std::forward<Args>(args)...);
-        else removeExclude(configIndex, std::forward<Args>(args)...);
+        if (value) addExclude(cfgIndex, std::forward<Args>(args)...);
+        else removeExclude(cfgIndex, std::forward<Args>(args)...);
     }
 
     template<typename... Args>
-    void setIncludeExclude(unsigned configIndex, bool value, Args&&... args)
+    void setIncludeExclude(unsigned cfgIndex, bool value, Args&&... args)
     {
-        if (value) addIncludeExclude(configIndex, std::forward<Args>(args)...);
-        else removeIncludeExclude(configIndex, std::forward<Args>(args)...);
+        if (value) addIncludeExclude(cfgIndex, std::forward<Args>(args)...);
+        else removeIncludeExclude(cfgIndex, std::forward<Args>(args)...);
     }
 
 
