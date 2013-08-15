@@ -150,7 +150,9 @@ private:
     };
 
     typedef std::basic_string<typename Regex::value_type> KeyT;
-    std::unordered_map<KeyT, RegexData> data;
+
+    // \todo gcc 3.6 can't hash u32strings so... map it is!
+    std::map<KeyT, RegexData> data;
 };
 
 
