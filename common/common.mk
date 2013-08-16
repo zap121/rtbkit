@@ -25,6 +25,6 @@ LIBRTB_LINK := \
 
 $(eval $(call library,rtb,$(LIBRTB_SOURCES),$(LIBRTB_LINK)))
 
-$(eval $(call library,filter_registry,filter.cc,arch utils))
+$(eval $(call library,filter_registry,filter.cc,arch utils rtb))
 
 $(eval $(call include_sub_make,testing,,common_testing.mk))

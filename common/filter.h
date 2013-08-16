@@ -48,9 +48,8 @@ struct ConfigSet
 
     void expand(size_t newSize)
     {
-        newSize = (newSize - 1) / Div + 1; // ceilDiv(newSize Div)
-        if (newSize <= size()) return;
-
+        if (newSize) newSize = (newSize - 1) / Div + 1; // ceilDiv(newSize, Div)
+        if (newSize <= bitfield.size()) return;
         bitfield.resize(newSize, defaultValue);
     }
 
@@ -73,8 +72,11 @@ struct ConfigSet
         bitfield[index / Div] &= ~(1ULL << (index % Div));
     }
 
+    bool operator[] (size_t index) const { return test(index); }
+
     bool test(size_t index) const
     {
+        if (index >= size()) return defaultValue;
         return bitfield[index / Div] & (1ULL << (index %Div));
     }
 
@@ -82,7 +84,7 @@ struct ConfigSet
     {
         size_t total = 0;
 
-        for (size_t i = 0; i < size(); ++i) {
+        for (size_t i = 0; i < bitfield.size(); ++i) {
             if (!bitfield[i]) continue;
             total += ML::num_bits_set(bitfield[i]);
         }
@@ -92,25 +94,25 @@ struct ConfigSet
 
     size_t empty() const
     {
-        for (size_t i = 0; i < size(); ++i) {
+        for (size_t i = 0; i < bitfield.size(); ++i) {
             if (bitfield[i]) return false;
         }
         return true;
     }
 
 
-#define RTBKIT_CONFIG_SET_OP(_op_)                              \
-    ConfigSet& operator _op_ (const ConfigSet& other)           \
-    {                                                           \
-        expand(other.size());                                   \
-                                                                \
-        for (size_t i = 0; i < other.size(); ++i)               \
-            bitfield[i] _op_ other.bitfield[i];                 \
-                                                                \
-        for (size_t i = other.size(); i < bitfield.size(); ++i) \
-            bitfield[i] _op_ other.defaultValue;                \
-                                                                \
-        return *this;                                           \
+#define RTBKIT_CONFIG_SET_OP(_op_)                                      \
+    ConfigSet& operator _op_ (const ConfigSet& other)                   \
+    {                                                                   \
+        expand(other.size());                                           \
+                                                                        \
+        for (size_t i = 0; i < other.bitfield.size(); ++i)              \
+            bitfield[i] _op_ other.bitfield[i];                         \
+                                                                        \
+        for (size_t i = other.bitfield.size(); i < bitfield.size(); ++i) \
+            bitfield[i] _op_ other.defaultValue;                        \
+                                                                        \
+        return *this;                                                   \
     }
 
     RTBKIT_CONFIG_SET_OP(&=)
@@ -121,7 +123,7 @@ struct ConfigSet
 
     ConfigSet& negate()
     {
-        for (size_t i = 0; i < size(); ++i)
+        for (size_t i = 0; i < bitfield.size(); ++i)
             bitfield[i] = ~bitfield[i];
         return *this;
     }
@@ -196,7 +198,16 @@ struct CreativeMatrix
     }
 
 
-    const ConfigSet& operator[] (size_t index) const { return matrix[index]; }
+    const ConfigSet& operator[] (size_t creative) const
+    {
+        return matrix[creative];
+    }
+
+    bool test(size_t creative, size_t config) const
+    {
+        if (creative >= matrix.size()) return defaultValue.test(config);
+        return matrix[creative].test(config);
+    }
 
     void set(size_t creative, size_t config, bool value = true)
     {
