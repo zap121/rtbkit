@@ -10,6 +10,8 @@
 #define BOOST_TEST_DYN_LINK
 
 #include "rtbkit/common/filter.h"
+#include "rtbkit/common/exchange_connector.h"
+#include "rtbkit/common/bid_request.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -177,5 +179,79 @@ BOOST_AUTO_TEST_CASE(creativeMatrixTest)
         for (size_t i = 0; i < n; ++i)
             for (size_t j = 0; j < m; ++j)
                 BOOST_CHECK(!matrix.test(i,j));
+    }
+}
+
+vector<CreativeMatrix>
+toMatrix(const unordered_map<unsigned, BiddableSpots>& spots)
+{
+    vector<CreativeMatrix> creatives;
+
+    for (const auto& configs : spots) {
+        for (const auto& spot : configs.second) {
+            if (spot.first >= creatives.size())
+                creatives.resize(spot.first + 1);
+
+            for (const auto& creative : spot.second)
+                creatives[spot.first].set(creative, configs.first);
+        }
+    }
+
+    return creatives;
+}
+
+vector<CreativeMatrix>
+getMatrix(const FilterState& state, unsigned maxImp)
+{
+    vector<CreativeMatrix> creatives(maxImp);
+
+    for (size_t imp = 0; imp < maxImp; ++imp)
+        creatives[imp] = state.creatives(imp);
+
+    return creatives;
+}
+
+void checkBiddableSpots(
+        const vector<CreativeMatrix>& value, const vector<CreativeMatrix>& exp)
+{
+    BOOST_CHECK_EQUAL(value.size(), exp.size());
+    size_t n = std::min(value.size(), exp.size());
+
+    for (size_t i = 0; i < n; ++i) {
+        CreativeMatrix diff = value[i];
+        diff ^= exp[i];
+        BOOST_CHECK(diff.empty());
+
+        if (!diff.empty()) {
+            cerr << "=== imp=" << i << endl;
+            cerr << "value=" << value[i].print() << endl;
+            cerr << "  exp=" << exp[i].print() << endl;
+            cerr << " diff=" << diff.print() << endl;
+        }
+    }
+}
+
+void checkBiddableSpots(FilterState& state)
+{
+    const auto& value = toMatrix(state.biddableSpots());
+    const auto& exp = getMatrix(state, state.request.imp.size());
+    checkBiddableSpots(value, exp);
+}
+
+BOOST_AUTO_TEST_CASE(filterStateTest)
+{
+    enum { spots = 10, creatives = 10, configs = 10 };
+
+    ExchangeConnector* ex = nullptr;
+    BidRequest br;
+    br.imp.resize(spots);
+
+    {
+        vector<unsigned> creativeCounts;
+        for (size_t i = 0; i < configs; ++i)
+            creativeCounts.push_back(creatives);
+
+        FilterState state(br, ex, creativeCounts);
+        checkBiddableSpots(state);
     }
 }

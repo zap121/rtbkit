@@ -201,7 +201,7 @@ addConfig(const string& name, const shared_ptr<AgentConfig>& config)
         configs.emplace_back(make_pair(name, config));
     }
 
-    activeConfigs.set(index);
+    activeConfigs[index] = config->creatives.size();
     for (FilterBase* filter : filters)
         filter->addConfig(index, config);
 }
@@ -213,7 +213,7 @@ removeConfig(const string& name)
     ssize_t index = findConfig(name);
     if (index < 0) return;
 
-    activeConfigs.reset(index);
+    activeConfigs[index] = 0;
     for (FilterBase* filter : filters)
         filter->removeConfig(index, configs[index].second);
 

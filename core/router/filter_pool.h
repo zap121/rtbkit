@@ -75,7 +75,7 @@ private:
         typedef std::pair<std::string, std::shared_ptr<AgentConfig> > ConfigEntry;
         std::vector<ConfigEntry> configs;
 
-        ConfigSet activeConfigs;
+        std::vector<unsigned> activeConfigs;
     };
 
     bool setData(Data*&, std::unique_ptr<Data>&);
