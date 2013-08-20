@@ -36,7 +36,7 @@ struct ConfigSet
     typedef uint64_t Word;
     static constexpr size_t Div = sizeof(Word) * 8;
 
-    ConfigSet(bool defaultValue = false) :
+    explicit ConfigSet(bool defaultValue = false) :
         defaultValue(defaultValue ? ~Word(0) : 0)
     {}
 
@@ -180,11 +180,11 @@ private:
 
 struct CreativeMatrix
 {
-    CreativeMatrix(bool defaultValue = false) :
+    explicit CreativeMatrix(bool defaultValue = false) :
         defaultValue(ConfigSet(defaultValue))
     {}
 
-    CreativeMatrix(ConfigSet defaultValue) :
+    explicit CreativeMatrix(ConfigSet defaultValue) :
         defaultValue(defaultValue)
     {}
 
@@ -271,13 +271,12 @@ struct CreativeMatrix
 
     std::string print() const
     {
-        if (matrix.empty()) return "[ ]";
-
         std::stringstream ss;
 
         ss << "[ ";
         for (size_t cr = 0; cr < matrix.size(); ++cr)
             ss << cr << ":" << matrix[cr].print() << " ";
+        ss << "d:" << defaultValue.print() << " ";
         ss << "]";
 
         return ss.str();
@@ -298,18 +297,7 @@ struct FilterState
     FilterState(
             const BidRequest& br,
             const ExchangeConnector* ex,
-            std::vector<unsigned> creativeCounts) :
-        request(br),
-        exchange(ex),
-        creativeCounts(std::move(creativeCounts))
-    {
-        for (size_t cfg = 0; cfg < this->creativeCounts.size(); ++cfg) {
-            if (this->creativeCounts[cfg]) configs_.set(cfg);
-
-            for (size_t crId = 0; crId <= this->creativeCounts[cfg]; ++crId)
-                defaultMatrix.set(crId, cfg);
-        }
-    }
+            std::vector<unsigned> creativeCounts);
 
     const BidRequest& request;
     const ExchangeConnector * const exchange;
@@ -319,19 +307,16 @@ struct FilterState
 
     CreativeMatrix creatives(unsigned impId) const
     {
-        CreativeMatrix mask = defaultMatrix;
-        mask &= CreativeMatrix(configs_);
-        if (impId >= creatives_.size()) return mask;
+        using namespace std;
 
+        CreativeMatrix mask(configs_);
         mask &= creatives_[impId];
         return mask;
     }
 
     void narrowCreativesForImp(unsigned impId, const CreativeMatrix& mask)
     {
-        expandCreatives(impId + 1);
         creatives_[impId] &= mask;
-        narrowConfigs(creatives_[impId].aggregate());
     }
 
     void narrowAllCreatives(const CreativeMatrix& mask)
@@ -343,22 +328,11 @@ struct FilterState
 
     /** Returns a map of configIndex to BiddableSpots object based on the
         creative matrix.
-
-        \todo Would be nice if we could remove the temp map in the inner loop.
      */
     std::unordered_map<unsigned, BiddableSpots> biddableSpots();
 
 private:
-
-    void expandCreatives(size_t newSize)
-    {
-        if (newSize <= creatives_.size()) return;
-        creatives_.resize(newSize, CreativeMatrix(configs_));
-    }
-
     ConfigSet configs_;
-    std::vector<unsigned> creativeCounts;
-    CreativeMatrix defaultMatrix;
     ML::compact_vector<CreativeMatrix, 4> creatives_;
 };
 

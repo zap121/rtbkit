@@ -247,11 +247,57 @@ BOOST_AUTO_TEST_CASE(filterStateTest)
     br.imp.resize(spots);
 
     {
+        cerr << "[basic]_______________________________________________________"
+            << endl;
+
         vector<unsigned> creativeCounts;
         for (size_t i = 0; i < configs; ++i)
             creativeCounts.push_back(creatives);
 
         FilterState state(br, ex, creativeCounts);
+        checkBiddableSpots(state);
+    }
+
+    {
+        cerr << "[diag]________________________________________________________"
+            << endl;
+
+        vector<unsigned> creativeCounts;
+        for (size_t i = 0; i < configs; ++i)
+            creativeCounts.push_back(i);
+
+        FilterState state(br, ex, creativeCounts);
+        checkBiddableSpots(state);
+
+        CreativeMatrix mask;
+        for (size_t cfg = 0; cfg < configs; ++cfg)
+            for (size_t cr = 0; cr < creatives / 2; ++cr)
+                mask.set(cr, cfg);
+
+        state.narrowAllCreatives(mask);
+        checkBiddableSpots(state);
+    }
+
+    {
+        cerr << "[per-imp]___________________________________________________"
+            << endl;
+
+        vector<unsigned> creativeCounts;
+        for (size_t i = 0; i < configs; ++i)
+            creativeCounts.push_back(configs - i);
+
+        FilterState state(br, ex, creativeCounts);
+
+        for (size_t imp = 0; imp < spots; ++imp) {
+            CreativeMatrix mask;
+
+            for (size_t cr = 0; cr < creatives; ++cr)
+                for (size_t cfg = 0; cfg < imp; ++cfg)
+                    mask.set(cr, cfg);
+
+            state.narrowCreativesForImp(imp, mask);
+        }
+
         checkBiddableSpots(state);
     }
 }
