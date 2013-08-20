@@ -129,18 +129,15 @@ struct IntervalFilter
             removeConfig(cfgIndex, value);
     }
 
-    ConfigSet filter(const T& value) const
+    ConfigSet filter(T value) const
     {
         ConfigSet matches;
 
-        for (const auto& ub : upperBounds) {
-            if (value >= ub.first) break;
-            matches |= ub.second;
-        }
+        for (size_t i = 0; i < intervals.size(); ++i) {
+            if (value < intervals[i].lowerBound) break;
+            if (!intervals[i].contains(value)) continue;
 
-        for (const auto& lb : lowerBounds) {
-            if (value >= lb.first) break;
-            matches &= lb.second.negate();
+            matches |= intervals[i].configs;
         }
 
         return matches;
@@ -148,71 +145,89 @@ struct IntervalFilter
 
 private:
 
+
+    struct Interval
+    {
+        Interval(unsigned cfgIndex, T lb, T ub) :
+            lowerBound(lb), upperBound(ub)
+        {
+            configs.set(cfgIndex);
+        }
+
+        T lowerBound;
+        T upperBound;
+        ConfigSet configs;
+
+        bool contains(T value) const
+        {
+            return lowerBound <= value && upperBound > value;
+        }
+
+        bool operator== (const Interval& other) const
+        {
+            return
+                lowerBound == other.lowerBound &&
+                upperBound == other.upperBound;
+        }
+    };
+
+    std::vector<Interval> intervals;
+
     void addConfig(unsigned cfgIndex, const std::pair<T, T>& interval)
     {
-        insertBound(cfgIndex, lowerBounds, interval.first);
-        insertBound(cfgIndex, upperBounds, interval.second);
+        addConfig(Interval(cfgIndex, interval.first, interval.second));
     }
 
     void removeConfig(unsigned cfgIndex, const std::pair<T, T>& interval)
     {
-        removeBound(cfgIndex, lowerBounds, interval.first);
-        removeBound(cfgIndex, upperBounds, interval.second);
+        removeConfig(Interval(cfgIndex, interval.first, interval.second));
     }
 
     void addConfig(unsigned cfgIndex, const UserPartition::Interval& interval)
     {
-        insertBound(cfgIndex, lowerBounds, interval.first);
-        insertBound(cfgIndex, upperBounds, interval.last);
+        addConfig(Interval(cfgIndex, interval.first, interval.last));
     }
 
     void removeConfig(unsigned cfgIndex, const UserPartition::Interval& interval)
     {
-        removeBound(cfgIndex, lowerBounds, interval.first);
-        removeBound(cfgIndex, upperBounds, interval.last);
+        removeConfig(Interval(cfgIndex, interval.first, interval.last));
     }
 
-
-    typedef std::vector< std::pair<T, ConfigSet> > BoundList;
-
-    void insertBound(unsigned cfgIndex, BoundList& list, T bound)
+    void addConfig(const Interval& interval)
     {
-        ssize_t index = findBound(list, bound);
+        ssize_t index = findInterval(interval);
 
-        if (index < 0) {
-            index = list.size();
-            list.emplace_back(bound, ConfigSet());
+        if (index < 0)
+            intervals.push_back(interval);
+
+        else if (interval == intervals[index]) {
+            ExcCheck(
+                    (intervals[index].configs & interval.configs).empty(),
+                    "duplicate range");
+            intervals[index].configs |= interval.configs;
         }
 
-        if (list[index].first != bound)
-            list.insert(list.begin() + index, make_pair(bound, ConfigSet()));
-
-        ExcAssertEqual(list[index].first, bound);
-
-        list[index].second.set(cfgIndex);
+        else intervals.insert(intervals.begin() + index, interval);
     }
 
-    void removeBound(unsigned cfgIndex, BoundList& list, T bound)
+    void removeConfig(const Interval& interval)
     {
-        ssize_t index = findBound(list, bound);
-        if (index < 0 || list[index].first != bound) return;
+        ssize_t index = findInterval(interval);
 
-        list[index].second.reset(cfgIndex);
-        if (!list[index].second.empty()) return;
+        if (index < 0) return;
 
-        list.erase(list.begin() + index);
+        if (interval == intervals[index])
+            intervals[index].configs &= interval.configs.negate();
     }
 
-    ssize_t findBound(const BoundList& list, T bound)
+    ssize_t findInterval(const Interval& interval)
     {
-        for (size_t i = 0; i < list.size(); ++i) {
-            if (list[i].first >= bound) return i;
+        for (size_t i = 0; i < intervals.size(); ++i) {
+            if (interval == intervals[i]) return i;
+            if (interval.lowerBound < intervals[i].lowerBound) return i;
         }
         return -1;
     }
-
-    BoundList lowerBounds;
-    BoundList upperBounds;
 };
 
 

@@ -14,35 +14,34 @@
 #include <boost/test/unit_test.hpp>
 
 using namespace std;
-using namespace ML;
+using namespace RTBKIT;
 using namespace Datacratic;
 
-void check(const ConfigSet& configs, const std::initializer_list<size_t>& expected)
+void check(const ConfigSet& configs, const initializer_list<size_t>& expected)
 {
-    bool err = false;
-    size_t cfg = configs.next();
+    ConfigSet ex;
+    for (size_t cfg : expected) ex.set(cfg);
 
-    for (size_t ex : expected) {
-        while (cfg < ex) {
-            err = true;
-            cerr << "\t" << cfg << " -> extra\n";
-            cfg = configs.next(cfg+1);
-        }
+    ConfigSet diff = configs;
+    diff ^= ex;
 
-        if (cfg > ex) {
-            err = true;
-            cerr << "\t" << ex << " -> missing\n";
-        }
+    if (diff.empty()) return;
 
-        if (ex == cfg) cfg = configs.next(cfg+1);
-    }
-
-    BOOST_CHECK(!err);
+    cerr << "val=" << configs.print() << endl
+        << "exp=" << ex.print() << endl
+        << "dif=" << diff.print() << endl;
+    BOOST_CHECK(false);
 }
 
-BOOST_AUTO_TEST_CASE( listFilterTest)
+BOOST_AUTO_TEST_CASE(listFilterTest)
 {
     ListFilter<size_t> filter;
+
+    BOOST_CHECK(filter.isEmpty({ }));
+    BOOST_CHECK(!filter.isEmpty({ 1 }));
+
+    cerr << "[ ListFilter-1 ]--------------------------------------------------"
+        << endl;
 
     filter.addConfig(0, { 1, 2, 3 });
     filter.addConfig(1, { 3, 4, 5 });
@@ -58,6 +57,9 @@ BOOST_AUTO_TEST_CASE( listFilterTest)
     check(filter.filter(6), { 3 });
     check(filter.filter(7), {  });
 
+    cerr << "[ ListFilter-2 ]--------------------------------------------------"
+        << endl;
+
     filter.removeConfig(3, { 0, 6 });
 
     check(filter.filter(0), {  });
@@ -69,6 +71,9 @@ BOOST_AUTO_TEST_CASE( listFilterTest)
     check(filter.filter(6), {  });
     check(filter.filter(7), {  });
 
+    cerr << "[ ListFilter-3 ]--------------------------------------------------"
+        << endl;
+
     filter.removeConfig(0, { 1, 2, 3 });
 
     check(filter.filter(0), {  });
@@ -77,6 +82,80 @@ BOOST_AUTO_TEST_CASE( listFilterTest)
     check(filter.filter(3), { 1 });
     check(filter.filter(4), { 1 });
     check(filter.filter(5), { 1, 2 });
+    check(filter.filter(6), {  });
+    check(filter.filter(7), {  });
+}
+
+BOOST_AUTO_TEST_CASE(intervalFilterTest)
+{
+    auto range = [] (size_t first, size_t last) {
+        return make_pair(first, last);
+    };
+
+    typedef pair<size_t, size_t> RangeT;
+    auto list = [] (const initializer_list<RangeT>& list) {
+        return vector<RangeT>(list.begin(), list.end());
+    };
+
+    IntervalFilter<size_t> filter;
+
+    cerr << "[ Interval-1 ]----------------------------------------------------"
+        << endl;
+
+    filter.addConfig(0, list({ range(1, 2) }));
+    filter.addConfig(1, list({ range(1, 3), range(2, 4) }));
+    filter.addConfig(2, list({ range(2, 4), range(5, 6) }));
+    filter.addConfig(3, list({ range(3, 4), range(4, 5) }));
+    filter.addConfig(4, list({ range(1, 2) }));
+
+    check(filter.filter(0), { });
+    check(filter.filter(1), { 0, 1, 4 });
+    check(filter.filter(2), { 1, 2 });
+    check(filter.filter(3), { 1, 2, 3 });
+    check(filter.filter(4), { 3 });
+    check(filter.filter(5), { 2 });
+    check(filter.filter(6), {  });
+    check(filter.filter(7), {  });
+
+    cerr << "[ Interval-2 ]----------------------------------------------------"
+        << endl;
+
+    filter.removeConfig(3, list({ range(3, 4), range(4, 5) }));
+
+    check(filter.filter(0), { });
+    check(filter.filter(1), { 0, 1, 4 });
+    check(filter.filter(2), { 1, 2 });
+    check(filter.filter(3), { 1, 2 });
+    check(filter.filter(4), {  });
+    check(filter.filter(5), { 2 });
+    check(filter.filter(6), {  });
+    check(filter.filter(7), {  });
+
+    cerr << "[ Interval-3 ]----------------------------------------------------"
+        << endl;
+
+    filter.removeConfig(1, list({ range(1, 3), range(2, 4) }));
+
+    check(filter.filter(0), { });
+    check(filter.filter(1), { 0, 4 });
+    check(filter.filter(2), { 2 });
+    check(filter.filter(3), { 2 });
+    check(filter.filter(4), {  });
+    check(filter.filter(5), { 2 });
+    check(filter.filter(6), {  });
+    check(filter.filter(7), {  });
+
+    cerr << "[ Interval-4 ]----------------------------------------------------"
+        << endl;
+
+    filter.removeConfig(4, list({ range(1, 2) }));
+
+    check(filter.filter(0), { });
+    check(filter.filter(1), { 0 });
+    check(filter.filter(2), { 2 });
+    check(filter.filter(3), { 2 });
+    check(filter.filter(4), {  });
+    check(filter.filter(5), { 2 });
     check(filter.filter(6), {  });
     check(filter.filter(7), {  });
 
