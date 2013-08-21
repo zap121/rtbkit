@@ -220,9 +220,9 @@ struct CreativeIncludeExcludeFilter
     template<typename... Args>
     void addInclude(unsigned cfgIndex, unsigned crIndex, Args&&... args)
     {
-        if (includes.isEmpty(std::forward<Args>(args)...))
-            emptyIncludes.reset(crIndex, cfgIndex);
-        else includes.addConfig(cfgIndex, crIndex, std::forward<Args>(args)...);
+        if (includes.isEmpty(std::forward<Args>(args)...)) return;
+        includes.addConfig(cfgIndex, crIndex, std::forward<Args>(args)...);
+        emptyIncludes.reset(crIndex, cfgIndex);
     }
 
     template<typename... Args>
@@ -244,9 +244,9 @@ struct CreativeIncludeExcludeFilter
     void removeInclude(
             unsigned cfgIndex, unsigned crIndex, Args&&... args)
     {
-        if (includes.isEmpty(std::forward<Args>(args)...))
-            emptyIncludes.set(crIndex, cfgIndex);
-        else includes.removeConfig(cfgIndex, crIndex, std::forward<Args>(args)...);
+        if (includes.isEmpty(std::forward<Args>(args)...)) return;
+        includes.removeConfig(cfgIndex, crIndex, std::forward<Args>(args)...);
+        emptyIncludes.set(crIndex, cfgIndex);
     }
 
     template<typename... Args>

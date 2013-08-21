@@ -433,15 +433,20 @@ struct ListFilter
     ConfigSet filter(const T& value) const
     {
         auto it = data.find(value);
-        return it == data.end()? ConfigSet() : it->second;
+        return it == data.end() ? ConfigSet() : it->second;
     }
 
     ConfigSet filter(const List& list) const
     {
         ConfigSet configs;
 
-        for (const auto& entry : list)
-            configs |= data[entry];
+        for (const auto& entry : list) {
+
+            auto it = data.find(entry);
+            if (it == data.end()) continue;
+
+            configs |= it->second;
+        }
 
         return configs;
     }
@@ -532,14 +537,17 @@ struct IncludeExcludeFilter
     template<typename... Args>
     void addInclude(unsigned cfgIndex, Args&&... args)
     {
-        if (!includes.isEmpty(std::forward<Args>(args)...))
-            emptyIncludes.reset(cfgIndex);
-        else includes.addConfig(cfgIndex, std::forward<Args>(args)...);
+        if (includes.isEmpty(std::forward<Args>(args)...)) return;
+
+        includes.addConfig(cfgIndex, std::forward<Args>(args)...);
+        emptyIncludes.reset(cfgIndex);
     }
 
     template<typename... Args>
     void addExclude(unsigned cfgIndex, Args&&... args)
     {
+        if (excludes.isEmpty(std::forward<Args>(args)...)) return;
+
         excludes.addConfig(cfgIndex, std::forward<Args>(args)...);
     }
 
@@ -554,14 +562,17 @@ struct IncludeExcludeFilter
     template<typename... Args>
     void removeInclude(unsigned cfgIndex, Args&&... args)
     {
-        if (includes.isEmpty(std::forward<Args>(args)...))
-            emptyIncludes.set(cfgIndex);
-        else includes.removeConfig(cfgIndex, std::forward<Args>(args)...);
+        if (includes.isEmpty(std::forward<Args>(args)...)) return;
+
+        includes.removeConfig(cfgIndex, std::forward<Args>(args)...);
+        emptyIncludes.set(cfgIndex);
     }
 
     template<typename... Args>
     void removeExclude(unsigned cfgIndex, Args&&... args)
     {
+        if (excludes.isEmpty(std::forward<Args>(args)...)) return;
+
         excludes.removeConfig(cfgIndex, std::forward<Args>(args)...);
     }
 
@@ -602,11 +613,9 @@ struct IncludeExcludeFilter
         ConfigSet configs = emptyIncludes;
 
         configs |= includes.filter(std::forward<Args>(args)...);
-
         if (configs.empty()) return configs;
 
         configs &= excludes.filter(std::forward<Args>(args)...).negate();
-
         return configs;
     }
 
