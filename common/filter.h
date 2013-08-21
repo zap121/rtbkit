@@ -94,6 +94,8 @@ struct ConfigSet
 
     size_t empty() const
     {
+        if (bitfield.empty()) return !defaultValue;
+
         for (size_t i = 0; i < bitfield.size(); ++i) {
             if (bitfield[i]) return false;
         }
@@ -139,6 +141,7 @@ struct ConfigSet
 
     ConfigSet& negate()
     {
+        defaultValue = ~defaultValue;
         for (size_t i = 0; i < bitfield.size(); ++i)
             bitfield[i] = ~bitfield[i];
         return *this;
@@ -180,6 +183,7 @@ struct ConfigSet
         std::stringstream ss;
         ss << "{ " << std::hex;
         for (Word w : bitfield) ss << w << " ";
+        ss << "d:" << (defaultValue ? "1" : "0") << " ";
         ss << "}";
         return ss.str();
     }
