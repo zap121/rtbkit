@@ -24,6 +24,12 @@ vector<T> makeList(const initializer_list<T>& list)
     return vector<T>(list.begin(), list.end());
 };
 
+void title(const string& title)
+{
+    size_t padding = 80 - 4 - title.size();
+    cerr << "[ " << title << " ]" << string(padding, '-') << endl;
+}
+
 void check(const ConfigSet& configs, const initializer_list<size_t>& expected)
 {
     ConfigSet ex;
@@ -47,9 +53,7 @@ BOOST_AUTO_TEST_CASE(listFilterTest)
     BOOST_CHECK(filter.isEmpty({ }));
     BOOST_CHECK(!filter.isEmpty({ 1 }));
 
-    cerr << "[ ListFilter-1 ]--------------------------------------------------"
-        << endl;
-
+    title("list-1");
     filter.addConfig(0, { 1, 2, 3 });
     filter.addConfig(1, { 3, 4, 5 });
     filter.addConfig(2, { 1, 5 });
@@ -64,9 +68,7 @@ BOOST_AUTO_TEST_CASE(listFilterTest)
     check(filter.filter(6), { 3 });
     check(filter.filter(7), {  });
 
-    cerr << "[ ListFilter-2 ]--------------------------------------------------"
-        << endl;
-
+    title("list-2");
     filter.removeConfig(3, { 0, 6 });
 
     check(filter.filter(0), {  });
@@ -78,9 +80,7 @@ BOOST_AUTO_TEST_CASE(listFilterTest)
     check(filter.filter(6), {  });
     check(filter.filter(7), {  });
 
-    cerr << "[ ListFilter-3 ]--------------------------------------------------"
-        << endl;
-
+    title("list-3");
     filter.removeConfig(0, { 1, 2, 3 });
 
     check(filter.filter(0), {  });
@@ -101,9 +101,7 @@ BOOST_AUTO_TEST_CASE(intervalFilterTest)
 
     IntervalFilter<size_t> filter;
 
-    cerr << "[ Interval-1 ]----------------------------------------------------"
-        << endl;
-
+    title("interval-1");
     filter.addConfig(0, makeList({ range(1, 2) }));
     filter.addConfig(1, makeList({ range(1, 3), range(2, 4) }));
     filter.addConfig(2, makeList({ range(2, 4), range(5, 6) }));
@@ -119,9 +117,7 @@ BOOST_AUTO_TEST_CASE(intervalFilterTest)
     check(filter.filter(6), {  });
     check(filter.filter(7), {  });
 
-    cerr << "[ Interval-2 ]----------------------------------------------------"
-        << endl;
-
+    title("interval-2");
     filter.removeConfig(3, makeList({ range(3, 4), range(4, 5) }));
 
     check(filter.filter(0), { });
@@ -133,9 +129,7 @@ BOOST_AUTO_TEST_CASE(intervalFilterTest)
     check(filter.filter(6), {  });
     check(filter.filter(7), {  });
 
-    cerr << "[ Interval-3 ]----------------------------------------------------"
-        << endl;
-
+    title("interval-3");
     filter.removeConfig(1, makeList({ range(1, 3), range(2, 4) }));
 
     check(filter.filter(0), { });
@@ -147,9 +141,7 @@ BOOST_AUTO_TEST_CASE(intervalFilterTest)
     check(filter.filter(6), {  });
     check(filter.filter(7), {  });
 
-    cerr << "[ Interval-4 ]----------------------------------------------------"
-        << endl;
-
+    title("interval-4");
     filter.removeConfig(4, makeList({ range(1, 2) }));
 
     check(filter.filter(0), { });
@@ -171,9 +163,7 @@ BOOST_AUTO_TEST_CASE(domainFilterTest)
     filter.addConfig(1, makeList<string>({ "google.com" }));
     filter.addConfig(2, makeList<string>({ "bob.org" }));
 
-    cerr << "[ Domain-1 ]------------------------------------------------------"
-        << endl;
-
+    title("domain-1");
     check(filter.filter(Url("site.google.com")), { 0, 1 });
     check(filter.filter(Url("google.com")),      { 0, 1 });
     check(filter.filter(Url("com")),             { 0 });
@@ -182,9 +172,7 @@ BOOST_AUTO_TEST_CASE(domainFilterTest)
     check(filter.filter(Url("bob.org")),         { 2 });
     check(filter.filter(Url("random.net")),      { });
 
-    cerr << "[ Domain-2 ]------------------------------------------------------"
-        << endl;
-
+    title("domain-2");
     filter.removeConfig(0, makeList<string>({ "com" }));
 
     check(filter.filter(Url("site.google.com")), { 1 });
@@ -195,9 +183,7 @@ BOOST_AUTO_TEST_CASE(domainFilterTest)
     check(filter.filter(Url("bob.org")),         { 2 });
     check(filter.filter(Url("random.net")),      { });
 
-    cerr << "[ Domain-3 ]------------------------------------------------------"
-        << endl;
-
+    title("domain-3");
     filter.removeConfig(2, makeList<string>({ "bob.org" }));
 
     check(filter.filter(Url("site.google.com")), { 1 });
@@ -207,4 +193,48 @@ BOOST_AUTO_TEST_CASE(domainFilterTest)
     check(filter.filter(Url("blooh.org")),       { });
     check(filter.filter(Url("bob.org")),         { });
     check(filter.filter(Url("random.net")),      { });
+}
+
+BOOST_AUTO_TEST_CASE(regexFilterTest)
+{
+    using boost::regex;
+    RegexFilter<regex, string> filter;
+
+    title("regex-1");
+    filter.addConfig(0, makeList({ regex("a"), regex("b")}));
+    filter.addConfig(1, makeList({ regex("a|b") }));
+    filter.addConfig(2, makeList({ regex("a"), regex("c")}));
+    filter.addConfig(3, makeList({ regex("^ab+")}));
+
+    check(filter.filter("a"),   { 0, 1, 2});
+    check(filter.filter("b"),   { 0, 1 });
+    check(filter.filter("c"),   { 2 });
+    check(filter.filter("abb"), { 0, 1, 2, 3 });
+    check(filter.filter("d"),   { });
+
+    title("regex-2");
+    filter.removeConfig(3, makeList({ regex("^ab+")}));
+
+    check(filter.filter("a"),   { 0, 1, 2});
+    check(filter.filter("b"),   { 0, 1 });
+    check(filter.filter("c"),   { 2 });
+    check(filter.filter("abb"), { 0, 1, 2 });
+    check(filter.filter("d"),   { });
+
+    title("regex-3");
+    filter.removeConfig(0, makeList({ regex("a"), regex("b")}));
+
+    check(filter.filter("a"),   { 1, 2});
+    check(filter.filter("b"),   { 1 });
+    check(filter.filter("c"),   { 2 });
+    check(filter.filter("abb"), { 1, 2 });
+    check(filter.filter("d"),   { });
+
+    filter.removeConfig(1, makeList({ regex("a|b") }));
+
+    check(filter.filter("a"),   { 2});
+    check(filter.filter("b"),   { });
+    check(filter.filter("c"),   { 2 });
+    check(filter.filter("abb"), { 2 });
+    check(filter.filter("d"),   { });
 }

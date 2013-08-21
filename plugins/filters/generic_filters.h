@@ -145,7 +145,6 @@ struct IntervalFilter
 
 private:
 
-
     struct Interval
     {
         Interval(unsigned cfgIndex, T lb, T ub) :
@@ -399,7 +398,12 @@ private:
 
     typedef std::basic_string<typename Regex::value_type> KeyT;
 
-    // \todo gcc 3.6 can't hash u32strings so... map it is!
+    /* \todo gcc 4.6 can't hash u32strings so use a map for now.
+
+       The problem is that while gcc does define it in its header, any attempts
+       to use it causes a linking error. This also prevents us from writting our
+       own because, you guessed it, gcc already defines it. Glorious is it not?
+    */
     std::map<KeyT, RegexData> data;
 };
 
