@@ -527,11 +527,13 @@ private:
 template<typename Filter>
 struct IncludeExcludeFilter
 {
+    IncludeExcludeFilter() : emptyIncludes(true) {}
+
     template<typename... Args>
     void addInclude(unsigned cfgIndex, Args&&... args)
     {
-        if (includes.isEmpty(std::forward<Args>(args)...))
-            emptyIncludes.set(cfgIndex);
+        if (!includes.isEmpty(std::forward<Args>(args)...))
+            emptyIncludes.reset(cfgIndex);
         else includes.addConfig(cfgIndex, std::forward<Args>(args)...);
     }
 
@@ -553,7 +555,7 @@ struct IncludeExcludeFilter
     void removeInclude(unsigned cfgIndex, Args&&... args)
     {
         if (includes.isEmpty(std::forward<Args>(args)...))
-            emptyIncludes.reset(cfgIndex);
+            emptyIncludes.set(cfgIndex);
         else includes.removeConfig(cfgIndex, std::forward<Args>(args)...);
     }
 
@@ -585,11 +587,12 @@ struct IncludeExcludeFilter
         else removeExclude(cfgIndex, std::forward<Args>(args)...);
     }
 
-    template<typename... Args>
-    void setIncludeExclude(unsigned cfgIndex, bool value, Args&&... args)
+    template<typename T, typename IE = std::vector<T> >
+    void setIncludeExclude(
+            unsigned cfgIndex, bool value, const IncludeExclude<T, IE>& ie)
     {
-        if (value) addIncludeExclude(cfgIndex, std::forward<Args>(args)...);
-        else removeIncludeExclude(cfgIndex, std::forward<Args>(args)...);
+        if (value) addIncludeExclude(cfgIndex, ie);
+        else removeIncludeExclude(cfgIndex, ie);
     }
 
 
