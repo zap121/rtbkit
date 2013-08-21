@@ -41,6 +41,9 @@ private:
 
     struct SegmentData
     {
+        typedef ListFilter<std::string> ExchangeFilterT;
+        IncludeExcludeFilter<ExchangeFilterT> exchange;
+
         IncludeExcludeFilter<SegmentListFilter> ie;
         ConfigSet excludeIfNotPresent;
     };

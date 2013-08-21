@@ -121,6 +121,22 @@ struct ConfigSet
 
 #undef RTBKIT_CONFIG_SET_OP
 
+#define RTBKIT_CONFIG_SET_OP_CONST(_op_)                        \
+    ConfigSet operator _op_ (const ConfigSet& other) const      \
+    {                                                           \
+        ConfigSet tmp = *this;                                  \
+        tmp _op_ ## = other;                                    \
+        return tmp;                                             \
+    }
+
+    RTBKIT_CONFIG_SET_OP_CONST(&)
+    RTBKIT_CONFIG_SET_OP_CONST(|)
+    RTBKIT_CONFIG_SET_OP_CONST(^)
+
+#undef RTBKIT_CONFIG_SET_OP_CONST
+
+
+
     ConfigSet& negate()
     {
         for (size_t i = 0; i < bitfield.size(); ++i)

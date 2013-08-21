@@ -32,6 +32,9 @@ setConfig(unsigned cfgIndex, const AgentConfig& config, bool value)
         segment.ie.setInclude(cfgIndex, value, entry.second.include);
         segment.ie.setExclude(cfgIndex, value, entry.second.exclude);
 
+        segment.exchange.setIncludeExclude(
+                cfgIndex, value, entry.second.applyToExchanges);
+
         if (entry.second.excludeIfNotPresent) {
             segment.excludeIfNotPresent.set(cfgIndex, value);
             excludeIfNotPresent.insert(entry.first);
@@ -51,7 +54,34 @@ filter(FilterState& state) const
         auto it = data.find(segment.first);
         if (it == data.end()) continue;
 
-        state.narrowConfigs(it->second.ie.filter(*segment.second));
+        /* This is a bit tricky because our filter mechanism doesn't gracefully
+           support skipping filters which is required for the exchange IE.
+
+           So we'll take this step by step by first applying the filter as is.
+        */
+        ConfigSet result = it->second.ie.filter(*segment.second);
+
+        /* Next, let's figure out which configs would change from 1 to 0 if we
+           applied result to the state.
+        */
+        ConfigSet affected = state.configs() ^ (state.configs() & result);
+        if (affected.empty()) continue;
+
+        /* Out of those configs, let's remove the ones that we should skip. Note
+           that the filter will return all the configs that should not be
+           skipped.
+         */
+        ConfigSet leftover =
+            affected & it->second.exchange.filter(state.request.exchange);
+        if (leftover.empty()) continue;
+
+        /* At this point we have a 1 in our leftover bitfield for each configs
+           that that would be filtered out and is not marked for skipping. We
+           can therefor remove those configs from state by negating the bitfield.
+
+           Magic!
+         */
+        state.narrowConfigs(leftover.negate());
         if (state.configs().empty()) return;
     }
 
