@@ -230,6 +230,7 @@ BOOST_AUTO_TEST_CASE(regexFilterTest)
     check(filter.filter("abb"), { 1, 2 });
     check(filter.filter("d"),   { });
 
+    title("regex-4");
     filter.removeConfig(1, makeList({ regex("a|b") }));
 
     check(filter.filter("a"),   { 2});
@@ -237,4 +238,45 @@ BOOST_AUTO_TEST_CASE(regexFilterTest)
     check(filter.filter("c"),   { 2 });
     check(filter.filter("abb"), { 2 });
     check(filter.filter("d"),   { });
+}
+
+BOOST_AUTO_TEST_CASE(segmentListTest)
+{
+    SegmentListFilter filter;
+
+    SegmentList seg0({ 1, 2, 3 });
+    SegmentList seg1({ "a", "b", "c" });
+    SegmentList seg2;
+    seg2.add(1);
+    seg2.add("a");
+
+    SegmentList segVal0({ 1, 2, 4 });
+    SegmentList segVal1({ "a", "b", "d" });
+
+    title("segment-1");
+    filter.addConfig(0, seg0);
+    filter.addConfig(1, seg1);
+    filter.addConfig(2, seg2);
+
+    check(filter.filter(1, ""),    { 0, 2 });
+    check(filter.filter(-1, "a"),  { 1, 2 });
+    check(filter.filter(segVal0),  { 0, 2 });
+    check(filter.filter(segVal1),  { 1, 2 });
+    check(filter.filter(seg2),     { 0, 1, 2 });
+
+    // sanity checks to make sure our filter has the same behaviour as the
+    // legacy filter.
+    BOOST_CHECK(seg0.match(segVal0));
+    BOOST_CHECK(seg2.match(segVal0));
+    BOOST_CHECK(seg1.match(segVal1));
+    BOOST_CHECK(seg2.match(segVal1));
+
+    title("segment-2");
+    filter.removeConfig(2, seg2);
+
+    check(filter.filter(1, ""),    { 0 });
+    check(filter.filter(-1, "a"),  { 1 });
+    check(filter.filter(segVal0),  { 0 });
+    check(filter.filter(segVal1),  { 1 });
+    check(filter.filter(seg2),     { 0, 1 });
 }

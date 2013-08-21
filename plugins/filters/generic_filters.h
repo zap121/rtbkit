@@ -482,7 +482,7 @@ struct SegmentListFilter
         setConfig(cfgIndex, segments, false);
     }
 
-    ConfigSet filter(int i, const std::string& str, float weights) const
+    ConfigSet filter(int i, const std::string& str) const
     {
         return i >= 0 ? get(intSet, i) : get(strSet, str);
     }
@@ -491,8 +491,8 @@ struct SegmentListFilter
     {
         ConfigSet configs;
 
-        segments.forEach([&](int i, std::string str, float weights) {
-                    configs |= filter(i, str, weights);
+        segments.forEach([&](int i, std::string str, float) {
+                    configs |= filter(i, str);
                 });
 
         return configs;
@@ -502,8 +502,8 @@ private:
 
     void setConfig(unsigned cfgIndex, const SegmentList& segments, bool value)
     {
-        segments.forEach([&](int i, std::string str, float weights) {
-                    if (i < 0) intSet[i].set(cfgIndex, value);
+        segments.forEach([&](int i, std::string str, float) {
+                    if (i >= 0) intSet[i].set(cfgIndex, value);
                     else strSet[str].set(cfgIndex, value);
                 });
     }
