@@ -9,6 +9,7 @@
 #define BOOST_TEST_MAIN
 #define BOOST_TEST_DYN_LINK
 
+#include "utils.h"
 #include "rtbkit/plugins/filters/generic_filters.h"
 
 #include <boost/test/unit_test.hpp>
@@ -17,18 +18,11 @@ using namespace std;
 using namespace RTBKIT;
 using namespace Datacratic;
 
-
 template<typename T>
 vector<T> makeList(const initializer_list<T>& list)
 {
     return vector<T>(list.begin(), list.end());
 };
-
-void title(const string& title)
-{
-    size_t padding = 80 - 4 - title.size();
-    cerr << "[ " << title << " ]" << string(padding, '-') << endl;
-}
 
 void check(const ConfigSet& configs, const initializer_list<size_t>& expected)
 {
@@ -244,14 +238,12 @@ BOOST_AUTO_TEST_CASE(segmentListTest)
 {
     SegmentListFilter filter;
 
-    SegmentList seg0({ 1, 2, 3 });
-    SegmentList seg1({ "a", "b", "c" });
-    SegmentList seg2;
-    seg2.add(1);
-    seg2.add("a");
+    SegmentList seg0 = segment(1, 2, 3);
+    SegmentList seg1 = segment("a", "b", "c");
+    SegmentList seg2 = segment(1, "a");
 
-    SegmentList segVal0({ 1, 2, 4 });
-    SegmentList segVal1({ "a", "b", "d" });
+    SegmentList segVal0 = segment( 1, 2, 4);
+    SegmentList segVal1 = segment("a", "b", "d");
 
     title("segment-1");
     filter.addConfig(0, seg0);
@@ -286,28 +278,6 @@ BOOST_AUTO_TEST_CASE(includeExcludeFilterTest)
     typedef ListFilter<size_t> BaseFilterT;
     IncludeExcludeFilter<BaseFilterT> filter;
 
-    auto add = [&] (
-            unsigned cfgIndex,
-            const initializer_list<size_t>& includes,
-            const initializer_list<size_t>& excludes)
-    {
-        IncludeExclude<size_t> ie;
-        for (size_t v : includes) ie.include.push_back(v);
-        for (size_t v : excludes) ie.exclude.push_back(v);
-        filter.addIncludeExclude(cfgIndex, ie);
-    };
-
-    auto remove = [&] (
-            unsigned cfgIndex,
-            const initializer_list<size_t>& includes,
-            const initializer_list<size_t>& excludes)
-    {
-        IncludeExclude<size_t> ie;
-        for (size_t v : includes) ie.include.push_back(v);
-        for (size_t v : excludes) ie.exclude.push_back(v);
-        filter.removeIncludeExclude(cfgIndex, ie);
-    };
-
     auto doCheck = [&] (ConfigSet configs, const initializer_list<size_t>& exp) {
         ConfigSet mask;
         for (size_t i = 0; i < 4; ++i) mask.set(i);
@@ -323,10 +293,10 @@ BOOST_AUTO_TEST_CASE(includeExcludeFilterTest)
     doCheck(filter.filter(makeList<size_t>({})), { 0, 1, 2, 3 });
 
     title("ie-2");
-    add(0, { 1, 2 }, { });
-    add(1, { },      { 1, 2 });
-    add(2, { 1, 2 }, { 3, 4 });
-    add(3, { 2, 3 }, { 3, 4 });
+    filter.addIncludeExclude(0, ie<size_t>({ 1, 2 }, { }));
+    filter.addIncludeExclude(1, ie<size_t>({ },      { 1, 2 }));
+    filter.addIncludeExclude(2, ie<size_t>({ 1, 2 }, { 3, 4 }));
+    filter.addIncludeExclude(3, ie<size_t>({ 2, 3 }, { 3, 4 }));
 
     doCheck(filter.filter(0), { 1 });
     doCheck(filter.filter(1), { 0, 2 });
@@ -339,7 +309,7 @@ BOOST_AUTO_TEST_CASE(includeExcludeFilterTest)
     // everything since it's include list became empty.
 
     title("ie-3");
-    remove(2, { 1, 2 }, { 3, 4 });
+    filter.removeIncludeExclude(2, ie<size_t>({ 1, 2 }, { 3, 4 }));
 
     doCheck(filter.filter(0), { 1, 2 });
     doCheck(filter.filter(1), { 0, 2 });
@@ -349,7 +319,7 @@ BOOST_AUTO_TEST_CASE(includeExcludeFilterTest)
     doCheck(filter.filter(5), { 1, 2 });
 
     title("ie-4");
-    remove(1, { },      { 1, 2 });
+    filter.removeIncludeExclude(1, ie<size_t>({ }, { 1, 2 }));
 
     doCheck(filter.filter(0), { 1, 2 });
     doCheck(filter.filter(1), { 0, 1, 2 });
@@ -357,5 +327,4 @@ BOOST_AUTO_TEST_CASE(includeExcludeFilterTest)
     doCheck(filter.filter(3), { 1, 2 });
     doCheck(filter.filter(4), { 1, 2 });
     doCheck(filter.filter(5), { 1, 2 });
-
 }
