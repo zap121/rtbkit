@@ -7,4 +7,5 @@
 #------------------------------------------------------------------------------#
 
 $(eval $(call test,generic_filters_test,filters,boost))
+$(eval $(call test,static_filters_test,filters,boost))
 

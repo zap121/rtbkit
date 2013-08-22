@@ -24,22 +24,6 @@ vector<T> makeList(const initializer_list<T>& list)
     return vector<T>(list.begin(), list.end());
 };
 
-void check(const ConfigSet& configs, const initializer_list<size_t>& expected)
-{
-    ConfigSet ex;
-    for (size_t cfg : expected) ex.set(cfg);
-
-    ConfigSet diff = configs;
-    diff ^= ex;
-
-    if (diff.empty()) return;
-
-    cerr << "val=" << configs.print() << endl
-        << "exp=" << ex.print() << endl
-        << "dif=" << diff.print() << endl;
-    BOOST_CHECK(false);
-}
-
 BOOST_AUTO_TEST_CASE(listFilterTest)
 {
     ListFilter<size_t> filter;

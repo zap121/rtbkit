@@ -9,8 +9,12 @@
 #pragma once
 
 #include "rtbkit/core/agent_configuration/include_exclude.h"
+#include "rtbkit/common/exchange_connector.h"
 #include "rtbkit/common/segments.h"
+#include "rtbkit/common/filter.h"
+#include "jml/utils/smart_ptr_utils.h"
 
+#include <boost/test/unit_test.hpp>
 #include <string>
 #include <iostream>
 
@@ -23,10 +27,31 @@ namespace RTBKIT {
 
 void title(const std::string& title)
 {
-    using namespace std;
+    std::string padding(80 - 4 - title.size(), '-');
+    std::cerr << "[ " << title << " ]" << padding << std::endl;
+}
 
-    size_t padding = 80 - 4 - title.size();
-    cerr << "[ " << title << " ]" << string(padding, '-') << endl;
+
+/******************************************************************************/
+/* CHECK                                                                      */
+/******************************************************************************/
+
+void check(
+        const ConfigSet& configs,
+        const std::initializer_list<size_t>& expected)
+{
+    ConfigSet ex;
+    for (size_t cfg : expected) ex.set(cfg);
+
+    ConfigSet diff = configs;
+    diff ^= ex;
+
+    if (diff.empty()) return;
+
+    std::cerr << "val=" << configs.print() << std::endl
+        << "exp=" << ex.print() << std::endl
+        << "dif=" << diff.print() << std::endl;
+    BOOST_CHECK(false);
 }
 
 
@@ -45,6 +70,11 @@ ie(     const std::initializer_list<T>& includes,
     return ie;
 }
 
+template<typename T, typename List = std::vector<T> >
+IncludeExclude<T, List> ie()
+{
+    return IncludeExclude<T, List>();
+}
 
 /******************************************************************************/
 /* SEGMENT                                                                    */
@@ -66,13 +96,47 @@ void segmentImpl(SegmentList& seg, Arg&& arg, Args&&... rest)
 }
 
 template<typename... Args>
-SegmentList
-segment(Args&&... args)
+SegmentList segment(Args&&... args)
 {
     SegmentList seg;
     segmentImpl(seg, std::forward<Args>(args)...);
     seg.sort();
     return seg;
 }
+
+
+/******************************************************************************/
+/* ADD/REMOVE CONFIG                                                          */
+/******************************************************************************/
+
+void addConfig(FilterBase& filter, unsigned cfgIndex, AgentConfig& cfg)
+{
+    filter.addConfig(cfgIndex, ML::make_unowned_sp(cfg));
+}
+
+void removeConfig(FilterBase& filter, unsigned cfgIndex, AgentConfig& cfg)
+{
+    filter.removeConfig(cfgIndex, ML::make_unowned_sp(cfg));
+}
+
+
+/******************************************************************************/
+/* FILTER EXCHANGE CONNECTOR                                                  */
+/******************************************************************************/
+
+struct FilterExchangeConnector : public ExchangeConnector
+{
+    FilterExchangeConnector(const std::string& name) :
+        ExchangeConnector(name), name(name)
+    {}
+
+    std::string exchangeName() const { return name; }
+
+    void configure(const Json::Value& parameters) {}
+    void enableUntil(Date date) {}
+
+private:
+    std::string name;
+};
 
 } // namespace RTBKIT
