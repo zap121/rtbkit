@@ -280,3 +280,82 @@ BOOST_AUTO_TEST_CASE(segmentListTest)
     check(filter.filter(segVal1),  { 1 });
     check(filter.filter(seg2),     { 0, 1 });
 }
+
+BOOST_AUTO_TEST_CASE(includeExcludeFilterTest)
+{
+    typedef ListFilter<size_t> BaseFilterT;
+    IncludeExcludeFilter<BaseFilterT> filter;
+
+    auto add = [&] (
+            unsigned cfgIndex,
+            const initializer_list<size_t>& includes,
+            const initializer_list<size_t>& excludes)
+    {
+        IncludeExclude<size_t> ie;
+        for (size_t v : includes) ie.include.push_back(v);
+        for (size_t v : excludes) ie.exclude.push_back(v);
+        filter.addIncludeExclude(cfgIndex, ie);
+    };
+
+    auto remove = [&] (
+            unsigned cfgIndex,
+            const initializer_list<size_t>& includes,
+            const initializer_list<size_t>& excludes)
+    {
+        IncludeExclude<size_t> ie;
+        for (size_t v : includes) ie.include.push_back(v);
+        for (size_t v : excludes) ie.exclude.push_back(v);
+        filter.removeIncludeExclude(cfgIndex, ie);
+    };
+
+    auto doCheck = [&] (ConfigSet configs, const initializer_list<size_t>& exp) {
+        ConfigSet mask;
+        for (size_t i = 0; i < 4; ++i) mask.set(i);
+
+        configs &= mask;
+        check(configs, exp);
+    };
+
+    title("ie-1");
+
+    // everything is included by default.
+    doCheck(filter.filter(1), { 0, 1, 2, 3 });
+    doCheck(filter.filter(makeList<size_t>({})), { 0, 1, 2, 3 });
+
+    title("ie-2");
+    add(0, { 1, 2 }, { });
+    add(1, { },      { 1, 2 });
+    add(2, { 1, 2 }, { 3, 4 });
+    add(3, { 2, 3 }, { 3, 4 });
+
+    doCheck(filter.filter(0), { 1 });
+    doCheck(filter.filter(1), { 0, 2 });
+    doCheck(filter.filter(2), { 0, 2, 3 });
+    doCheck(filter.filter(3), { 1 });
+    doCheck(filter.filter(4), { 1 });
+    doCheck(filter.filter(5), { 1 });
+
+    // Note that removing a config means that it will be included into
+    // everything since it's include list became empty.
+
+    title("ie-3");
+    remove(2, { 1, 2 }, { 3, 4 });
+
+    doCheck(filter.filter(0), { 1, 2 });
+    doCheck(filter.filter(1), { 0, 2 });
+    doCheck(filter.filter(2), { 0, 2, 3 });
+    doCheck(filter.filter(3), { 1, 2 });
+    doCheck(filter.filter(4), { 1, 2 });
+    doCheck(filter.filter(5), { 1, 2 });
+
+    title("ie-4");
+    remove(1, { },      { 1, 2 });
+
+    doCheck(filter.filter(0), { 1, 2 });
+    doCheck(filter.filter(1), { 0, 1, 2 });
+    doCheck(filter.filter(2), { 0, 1, 2, 3 });
+    doCheck(filter.filter(3), { 1, 2 });
+    doCheck(filter.filter(4), { 1, 2 });
+    doCheck(filter.filter(5), { 1, 2 });
+
+}
