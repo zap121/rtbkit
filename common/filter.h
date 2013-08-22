@@ -317,7 +317,7 @@ struct FilterState
     FilterState(
             const BidRequest& br,
             const ExchangeConnector* ex,
-            std::vector<unsigned> creativeCounts);
+            const std::vector<unsigned>& creativeCounts);
 
     const BidRequest& request;
     const ExchangeConnector * const exchange;
