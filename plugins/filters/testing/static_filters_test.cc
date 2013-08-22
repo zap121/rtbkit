@@ -7,9 +7,10 @@
     Note that these tests assume that the generic filters work properly so we
     don't waste time constructing complicated set of include/exclude statements.
 
-    \todo need a test for segments that checks that one segment passes and
-    another segment fails for the same config.
-
+    \todo UserParitionFilter
+    \todo HourOfTheWeek
+    \todo Exchange Pre/Post filter ???
+    \todo RequiredIdsFilter
  */
 
 #define BOOST_TEST_MAIN
