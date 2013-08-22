@@ -46,6 +46,9 @@ private:
 
         IncludeExcludeFilter<SegmentListFilter> ie;
         ConfigSet excludeIfNotPresent;
+
+        ConfigSet applyExchangeFilter(
+                FilterState& state, const ConfigSet& result) const;
     };
 
     std::unordered_map<std::string, SegmentData> data;
