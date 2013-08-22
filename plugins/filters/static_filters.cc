@@ -36,8 +36,13 @@ setConfig(unsigned cfgIndex, const AgentConfig& config, bool value)
                 cfgIndex, value, entry.second.applyToExchanges);
 
         if (entry.second.excludeIfNotPresent) {
+            if (value && segment.excludeIfNotPresent.empty())
+                excludeIfNotPresent.insert(entry.first);
+
             segment.excludeIfNotPresent.set(cfgIndex, value);
-            excludeIfNotPresent.insert(entry.first);
+
+            if (!value && segment.excludeIfNotPresent.empty())
+                excludeIfNotPresent.erase(entry.first);
         }
     }
 }
