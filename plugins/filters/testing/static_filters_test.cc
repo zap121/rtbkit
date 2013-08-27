@@ -32,7 +32,7 @@ using namespace Datacratic;
 void check(
         const FilterBase& filter,
         BidRequest& request,
-        const std::string exchangeName,
+        const string exchangeName,
         const ConfigSet& mask,
         const initializer_list<size_t>& exp)
 {
@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE( segmentFilter_simple )
 
     auto doCheck = [&] (
             BidRequest& request,
-            const std::string& exchangeName,
+            const string& exchangeName,
             const initializer_list<size_t>& expected)
     {
         check(filter, request, exchangeName, mask, expected);
@@ -148,7 +148,7 @@ BOOST_AUTO_TEST_CASE( segmentFilter_excludeIfNotPresent )
 
     auto doCheck = [&] (
             BidRequest& request,
-            const std::string& exchangeName,
+            const string& exchangeName,
             const initializer_list<size_t>& expected)
     {
         check(filter, request, exchangeName, mask, expected);
@@ -218,7 +218,7 @@ BOOST_AUTO_TEST_CASE( segmentFilter_exchange )
 
     auto doCheck = [&] (
             BidRequest& request,
-            const std::string& exchangeName,
+            const string& exchangeName,
             const initializer_list<size_t>& expected)
     {
         check(filter, request, exchangeName, mask, expected);
@@ -308,4 +308,132 @@ BOOST_AUTO_TEST_CASE( segmentFilter_exchange )
 
     doCheck(r0, "ex3", { 1, 3, 4 });
     doCheck(r1, "ex3", { 1, 4 });
+}
+
+BOOST_AUTO_TEST_CASE( userPartition )
+{
+    UserPartitionFilter filter;
+    ConfigSet mask;
+
+    auto doCheck = [&] (
+            BidRequest& request,
+            const string& exchangeName,
+            const initializer_list<size_t>& expected)
+    {
+        check(filter, request, exchangeName, mask, expected);
+    };
+
+    auto setReq = [] (BidRequest& request, Id eid, string ip, string ua) {
+        request.userIds.exchangeId = eid;
+        request.userIds.providerId = Id(0);
+        request.ipAddress = ip;
+        request.userAgent = ua;
+    };
+
+    auto setCfg = [] (
+            AgentConfig& config, UserPartition::HashOn hashOn, int modulus)
+    {
+        config.userPartition.hashOn = hashOn;
+        config.userPartition.modulus = modulus;
+    };
+
+    typedef pair<int, int> PairT;
+    auto add = [] (AgentConfig& config, const initializer_list<PairT>& ranges) {
+
+        // This is terible but the UserPartition constructor adds a 0-1 range.
+        // While it's tempting to fix it, I'm pretty sure there's some code
+        // somewhere that rely on this arcanne behaviour so I have to
+        // investigate first.
+        config.userPartition.includeRanges.clear();
+
+        for (const auto& range : ranges) {
+            config.userPartition.includeRanges.emplace_back(
+                    range.first, range.second);
+        }
+    };
+
+    AgentConfig c0;
+    setCfg(c0, UserPartition::NONE, 10);
+
+    AgentConfig c1;
+    setCfg(c1, UserPartition::EXCHANGEID, 8);
+    add(c1, { {0, 5} });
+
+    AgentConfig c2;
+    setCfg(c2, UserPartition::EXCHANGEID, 16);
+    add(c2, { {5, 8}, {12, 16} });
+
+    AgentConfig c3;
+    setCfg(c3, UserPartition::IPUA, 2);
+    add(c3, { {0, 1} });
+
+    AgentConfig c4;
+    setCfg(c4, UserPartition::IPUA, 2);
+    add(c4, { {1, 2} });
+
+
+    // Since the following strings are hashed, any changes to them will affect
+    // the outcome of the test. I recomend, you don't do that.
+
+    BidRequest r0; setReq(r0, Id(0),  "1.1.1.1", "ua-0"); // eid = 15, ipua = 0
+    BidRequest r1; setReq(r1, Id(1),  "2.2.2.2", "ua-0"); // eid = 4,  ipua = 1
+    BidRequest r2; setReq(r2, Id(1),  "1.1.1.1", "ua-1"); // eid = 4,  ipua = 0
+    BidRequest r3; setReq(r3, Id(0),  "2.2.2.2", "ua-1"); // eid = 15, ipua = 1
+    BidRequest r4; setReq(r4, Id(""), "1.1.1.1", "ua-1"); // eid = -,  ipua = 0
+    BidRequest r5; setReq(r5, Id(0),  "",        "ua-1"); // eid = 15, ipua = 1
+    BidRequest r6; setReq(r6, Id(0),  "1.1.1.1", "");     // eid = 15, ipua = 0
+    BidRequest r7; setReq(r7, Id(0),  "",        "");     // eid = 15, ipua = -
+
+
+    title("userPartition-1");
+    addConfig(filter, 0, c0); mask.set(0);
+    addConfig(filter, 1, c1); mask.set(1);
+    addConfig(filter, 2, c2); mask.set(2);
+    addConfig(filter, 3, c3); mask.set(3);
+    addConfig(filter, 4, c4); mask.set(4);
+
+    doCheck(r0, "ex1", { 0, 2, 3 });
+    doCheck(r1, "ex1", { 0, 1, 4 });
+    doCheck(r2, "ex1", { 0, 1, 3 });
+    doCheck(r3, "ex1", { 0, 2, 4 });
+    doCheck(r4, "ex1", { 0, 3 });
+    doCheck(r5, "ex1", { 0, 2, 4 });
+    doCheck(r6, "ex1", { 0, 2, 3 });
+    doCheck(r7, "ex1", { 0, 2 });
+
+    title("userPartition-2");
+    removeConfig(filter, 0, c0); mask.reset(0);
+
+    doCheck(r0, "ex1", { 2, 3 });
+    doCheck(r1, "ex1", { 1, 4 });
+    doCheck(r2, "ex1", { 1, 3 });
+    doCheck(r3, "ex1", { 2, 4 });
+    doCheck(r4, "ex1", { 3 });
+    doCheck(r5, "ex1", { 2, 4 });
+    doCheck(r6, "ex1", { 2, 3 });
+    doCheck(r7, "ex1", { 2 });
+
+    title("userPartition-3");
+    removeConfig(filter, 3, c3); mask.reset(3);
+
+    doCheck(r0, "ex1", { 2 });
+    doCheck(r1, "ex1", { 1, 4 });
+    doCheck(r2, "ex1", { 1 });
+    doCheck(r3, "ex1", { 2, 4 });
+    doCheck(r4, "ex1", { });
+    doCheck(r5, "ex1", { 2, 4 });
+    doCheck(r6, "ex1", { 2 });
+    doCheck(r7, "ex1", { 2 });
+
+    title("userPartition-4");
+    removeConfig(filter, 1, c1); mask.reset(1);
+
+    doCheck(r0, "ex1", { 2 });
+    doCheck(r1, "ex1", { 4 });
+    doCheck(r2, "ex1", { });
+    doCheck(r3, "ex1", { 2, 4 });
+    doCheck(r4, "ex1", { });
+    doCheck(r5, "ex1", { 2, 4 });
+    doCheck(r6, "ex1", { 2 });
+    doCheck(r7, "ex1", { 2 });
 }

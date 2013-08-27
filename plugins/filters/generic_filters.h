@@ -199,12 +199,8 @@ private:
         if (index < 0)
             intervals.push_back(interval);
 
-        else if (interval == intervals[index]) {
-            ExcCheck(
-                    (intervals[index].configs & interval.configs).empty(),
-                    "duplicate range");
+        else if (interval == intervals[index])
             intervals[index].configs |= interval.configs;
-        }
 
         else intervals.insert(intervals.begin() + index, interval);
     }
