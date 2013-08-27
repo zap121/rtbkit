@@ -56,6 +56,17 @@ StandardAdServerConnector(std::shared_ptr<ServiceProxies> & proxy,
 {
 }
 
+StandardAdServerConnector::
+StandardAdServerConnector(std::shared_ptr<ServiceProxies> const & proxies,
+                          Json::Value const & json) :
+    HttpAdServerConnector(json.get("name", "standard-adserver").asString(), proxies),
+    publisher_(getServices()->zmqContext) {
+    int winPort = json.get("winPort", 18143).asInt();
+    int eventsPort = json.get("eventsPort", 18144).asInt();
+    int externalWinPort = json.get("externalWinPort", 18145).asInt();
+    init(winPort, eventsPort, externalWinPort);
+}
+
 void
 StandardAdServerConnector::
 init(StandardAdServerArguments & ssConfig)
@@ -236,3 +247,18 @@ handleExternalWinRq(const HttpHeader & header,
                        std::to_string(price), dataCost.toString(),
                        boost::trim_copy(bidRequest.toString()));
 }
+
+namespace {
+
+struct AtInit {
+    AtInit()
+    {
+        AdServerConnector::registerFactory("standard", [](std::shared_ptr<ServiceProxies> const & proxies,
+                                                          Json::Value const & json) {
+            return new StandardAdServerConnector(proxies, json);
+        });
+    }
+} atInit;
+
+}
+

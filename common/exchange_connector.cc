@@ -75,11 +75,11 @@ getWinCostModel(Auction const & auction,
     return WinCostModel();
 }
 
-std::shared_ptr<BidSource>
+std::string
 ExchangeConnector::
-getBidSource() const
+getBidSourceConfiguration() const
 {
-    return 0;
+    return "{\"type\":\"unknown\"}";
 }
 
 ExchangeConnector::ExchangeCompatibility
@@ -149,6 +149,7 @@ getFactory(std::string const & name) {
     std::string path = "lib" + name + "_exchange.so";
     void * handle = dlopen(path.c_str(), RTLD_NOW);
     if (!handle) {
+        std::cerr << dlerror() << std::endl;
         throw ML::Exception("couldn't find exchange connector library " + path);
     }
 
