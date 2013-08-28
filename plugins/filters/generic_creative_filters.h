@@ -151,7 +151,12 @@ private:
 
     typedef std::basic_string<typename Regex::value_type> KeyT;
 
-    // \todo gcc 3.6 can't hash u32strings so... map it is!
+    /* \todo gcc 4.6 can't hash u32strings so use a map for now.
+
+       The problem is that while gcc does define it in its header, any attempts
+       to use it causes a linking error. This also prevents us from writting our
+       own because, you guessed it, gcc already defines it. Glorious is it not?
+    */
     std::map<KeyT, RegexData> data;
 };
 
@@ -181,15 +186,20 @@ struct CreativeListFilter
     CreativeMatrix filter(const T& value) const
     {
         auto it = data.find(value);
-        return it == data.end()? CreativeMatrix() : it->second;
+        return it == data.end() ? CreativeMatrix() : it->second;
     }
 
     CreativeMatrix filter(const List& list) const
     {
         CreativeMatrix configs;
 
-        for (const auto& entry : list)
-            configs |= data[entry];
+        for (const auto& entry : list) {
+
+            auto it = data.find(entry);
+            if (it == data.end()) continue;
+
+            configs |= it->second;
+        }
 
         return configs;
     }
@@ -221,6 +231,7 @@ struct CreativeIncludeExcludeFilter
     void addInclude(unsigned cfgIndex, unsigned crIndex, Args&&... args)
     {
         if (includes.isEmpty(std::forward<Args>(args)...)) return;
+
         includes.addConfig(cfgIndex, crIndex, std::forward<Args>(args)...);
         emptyIncludes.reset(crIndex, cfgIndex);
     }
@@ -228,7 +239,9 @@ struct CreativeIncludeExcludeFilter
     template<typename... Args>
     void addExclude(unsigned cfgIndex, unsigned crIndex, Args&&... args)
     {
-        excludes.addConfig(cfgIndex, crIndex, std::forward<Args>(args)...);
+        if (excludes.isEmpty(std::forward<Args>(args)...)) return;
+
+       excludes.addConfig(cfgIndex, crIndex, std::forward<Args>(args)...);
     }
 
     template<typename T, typename IE = std::vector<T> >
@@ -245,6 +258,7 @@ struct CreativeIncludeExcludeFilter
             unsigned cfgIndex, unsigned crIndex, Args&&... args)
     {
         if (includes.isEmpty(std::forward<Args>(args)...)) return;
+
         includes.removeConfig(cfgIndex, crIndex, std::forward<Args>(args)...);
         emptyIncludes.set(crIndex, cfgIndex);
     }
@@ -253,8 +267,9 @@ struct CreativeIncludeExcludeFilter
     void removeExclude(
             unsigned cfgIndex, unsigned crIndex, Args&&... args)
     {
-        excludes.removeConfig(
-                cfgIndex, crIndex, std::forward<Args>(args)...);
+        if (excludes.isEmpty(std::forward<Args>(args)...)) return;
+
+        excludes.removeConfig(cfgIndex, crIndex, std::forward<Args>(args)...);
     }
 
     template<typename T, typename IE = std::vector<T> >
@@ -270,8 +285,7 @@ struct CreativeIncludeExcludeFilter
     void setInclude(
             unsigned cfgIndex, unsigned crIndex, bool value, Args&&... args)
     {
-        if (value)
-            addInclude(cfgIndex, crIndex, std::forward<Args>(args)...);
+        if (value) addInclude(cfgIndex, crIndex, std::forward<Args>(args)...);
         else removeInclude(cfgIndex, crIndex, std::forward<Args>(args)...);
     }
 
@@ -279,8 +293,7 @@ struct CreativeIncludeExcludeFilter
     void setExclude(
             unsigned cfgIndex, unsigned crIndex, bool value, Args&&... args)
     {
-        if (value)
-            addExclude(cfgIndex, crIndex, std::forward<Args>(args)...);
+        if (value) addExclude(cfgIndex, crIndex, std::forward<Args>(args)...);
         else removeExclude(cfgIndex, crIndex, std::forward<Args>(args)...);
     }
 
@@ -300,11 +313,9 @@ struct CreativeIncludeExcludeFilter
         CreativeMatrix creatives = emptyIncludes;
 
         creatives |= includes.filter(std::forward<Args>(args)...);
-
         if (creatives.empty()) return creatives;
 
         creatives &= excludes.filter(std::forward<Args>(args)...).negate();
-
         return creatives;
     }
 
