@@ -54,6 +54,26 @@ void check(
     BOOST_CHECK(false);
 }
 
+void check(
+        const CreativeMatrix& creatives,
+        const std::vector< std::vector<size_t> >& expected)
+{
+    CreativeMatrix exp;
+    for (size_t cr = 0; cr < expected.size(); ++cr)
+        for (size_t cfg : expected[cr])
+            exp.set(cr, cfg);
+
+    CreativeMatrix diff = creatives;
+    diff ^= exp;
+
+    if (diff.empty()) return;
+
+    std::cerr << "val=" << creatives.print() << std::endl
+        << "exp=" << exp.print() << std::endl
+        << "dif=" << diff.print() << std::endl;
+    BOOST_CHECK(false);
+}
+
 
 /******************************************************************************/
 /* IE                                                                         */
