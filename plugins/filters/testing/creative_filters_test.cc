@@ -23,6 +23,26 @@ using namespace ML;
 using namespace Datacratic;
 
 
+/******************************************************************************/
+/* UTILS                                                                      */
+/******************************************************************************/
+
+void check(
+        const FilterBase& filter,
+        const BidRequest& request,
+        const vector<unsigned> creatives,
+        unsigned imp,
+        const std::vector< std::vector<size_t> >& expected)
+{
+    FilterExchangeConnector conn("bob");
+
+    FilterState state(request, &conn, creatives);
+    filter.filter(state);
+
+    check(state.creatives(imp), expected);
+}
+
+
 void addImp(
         BidRequest& request,
         OpenRTB::AdPosition::Vals pos,
@@ -56,10 +76,13 @@ void removeConfig(
 }
 
 
+/******************************************************************************/
+/* FORMAT FILTER                                                              */
+/******************************************************************************/
+
 BOOST_AUTO_TEST_CASE( testFormatFilter )
 {
     CreativeFormatFilter filter;
-
     vector<unsigned> creatives;
 
     AgentConfig c0;
@@ -79,34 +102,80 @@ BOOST_AUTO_TEST_CASE( testFormatFilter )
     addImp(r0, OpenRTB::AdPosition::ABOVE, { {400, 400} });
 
 
-    FilterExchangeConnector conn("bob");
+    title("format-1");
+    addConfig(filter, 0, c0, creatives);
+    addConfig(filter, 1, c1, creatives);
 
-    {
-        title("formatFilter-1");
-        addConfig(filter, 0, c0, creatives);
-        addConfig(filter, 1, c1, creatives);
+    check(filter, r0, creatives, 0, { {0, 1}, {0}        });
+    check(filter, r0, creatives, 1, { {0, 1}, {0, 1}     });
+    check(filter, r0, creatives, 2, { {0},    {1},   {0} });
+    check(filter, r0, creatives, 3, { {0},    {},    {0} });
+    check(filter, r0, creatives, 4, { {0}                });
 
-        FilterState state(r0, &conn, creatives);
-        filter.filter(state);
 
-        check(state.creatives(0), { {0, 1}, {0}        });
-        check(state.creatives(1), { {0, 1}, {0, 1}     });
-        check(state.creatives(2), { {0},    {1},   {0} });
-        check(state.creatives(3), { {0},    {},    {0} });
-        check(state.creatives(4), { {0}                });
-    }
+    title("format-2");
+    removeConfig(filter, 0, c0, creatives);
 
-    {
-        title("formatFilter-2");
-        removeConfig(filter, 0, c0, creatives);
+    check(filter, r0, creatives, 0, { {1},     });
+    check(filter, r0, creatives, 1, { {1}, {1} });
+    check(filter, r0, creatives, 2, { {},  {1} });
+    check(filter, r0, creatives, 3, {          });
+    check(filter, r0, creatives, 4, {          });
+}
 
-        FilterState state(r0, &conn, creatives);
-        filter.filter(state);
 
-        check(state.creatives(0), { {1},     });
-        check(state.creatives(1), { {1}, {1} });
-        check(state.creatives(2), { {},  {1} });
-        check(state.creatives(3), {          });
-        check(state.creatives(4), {          });
-    }
+/******************************************************************************/
+/* LANGUAGE FILTER                                                            */
+/******************************************************************************/
+
+BOOST_AUTO_TEST_CASE( testLanguageFilter )
+{
+    CreativeLanguageFilter filter;
+    vector<unsigned> creatives;
+
+    auto addCr = [] (AgentConfig& cfg, const IncludeExclude<string>& ie) {
+        cfg.creatives.emplace_back();
+        cfg.creatives.back().languageFilter = std::move(ie);
+    };
+
+    AgentConfig c0;
+    addCr(c0, ie<string>({"fr"}, {}));
+    addCr(c0, ie<string>({}, {"en"}));
+
+    AgentConfig c1;
+    addCr(c1, ie<string>({"en"}, {}));
+    addCr(c1, ie<string>({"en"}, {"fr"}));
+
+    BidRequest r0;
+    r0.language = "en";
+    addImp(r0, OpenRTB::AdPosition::ABOVE, { {100, 100} });
+    addImp(r0, OpenRTB::AdPosition::ABOVE, { {200, 200}, {100, 100} });
+
+    BidRequest r1;
+    r1.language = "fr";
+    addImp(r1, OpenRTB::AdPosition::ABOVE, { {100, 100} });
+
+    BidRequest r2;
+    r2.language = "es";
+    addImp(r2, OpenRTB::AdPosition::ABOVE, { {100, 100} });
+
+
+    title("language-1");
+    addConfig(filter, 0, c0, creatives);
+    addConfig(filter, 1, c1, creatives);
+
+    check(filter, r0, creatives, 0, { {1}, {1} });
+    check(filter, r0, creatives, 1, { {1}, {1} });
+    check(filter, r1, creatives, 0, { {0}, {0} });
+    title("language-1-d");
+    check(filter, r2, creatives, 0, { {},  {0} });
+
+
+    title("language-2");
+    removeConfig(filter, 0, c0, creatives);
+
+    check(filter, r0, creatives, 0, { {1}, {1} });
+    check(filter, r0, creatives, 1, { {1}, {1} });
+    check(filter, r1, creatives, 0, {          });
+    check(filter, r2, creatives, 0, {          });
 }
