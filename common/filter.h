@@ -270,6 +270,7 @@ struct CreativeMatrix
 
     CreativeMatrix& negate()
     {
+        defaultValue = defaultValue.negate();
         for (ConfigSet& set : matrix) set.negate();
         return *this;
     }
