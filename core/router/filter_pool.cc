@@ -10,6 +10,7 @@
 #include "rtbkit/common/bid_request.h"
 #include "rtbkit/common/exchange_connector.h"
 #include "rtbkit/core/agent_configuration/agent_config.h"
+#include "soa/service/service_base.h"
 #include "jml/utils/exc_check.h"
 
 
@@ -30,6 +31,13 @@ initWithDefaultFilters(FilterPool& pool)
 {
     for (const auto& filter : FilterRegistry::listFilters())
         pool.addFilter(filter);
+}
+
+void
+FilterPool::
+init(EventRecorder* events)
+{
+    this->events = events;
 }
 
 
@@ -61,32 +69,50 @@ FilterPool::
     gc.deferBarrier();
 }
 
+void
+FilterPool::
+record(const Data* data, const FilterBase* filter, const ConfigSet& diff)
+{
+    for (size_t cfg = diff.next(); cfg < diff.size(); cfg = diff.next(cfg+1)) {
+        const AgentConfig& config = *data->configs[cfg].second;
+
+        events->recordHit("accounts.%s.filter.%03d_%s",
+                config.account.toString('.'),
+                filter->priority(), filter->name());
+    }
+}
 
 FilterPool::ConfigList
 FilterPool::
-filter(const BidRequest& br, const ExchangeConnector* conn)
+filter(const BidRequest& br, const ExchangeConnector* conn, const ConfigSet& mask)
 {
     GcLockBase::SharedGuard guard(gc, GcLockBase::RD_NO);
 
-    Data* current = data.load();
+    const Data* current = data.load();
     FilterState state(br, conn, current->activeConfigs);
+
+    state.narrowConfigs(mask);
+    ConfigSet configs = state.configs();
 
     for (FilterBase* filter : current->filters) {
         filter->filter(state);
+
+        if (events) {
+            record(data, filter, configs ^ state.configs());
+            configs = state.configs();
+        }
+
         if (state.configs().empty()) break;
     }
 
     auto biddableSpots = state.biddableSpots();
+    configs = state.configs();
 
-    ConfigList configs;
-    for (size_t i = state.configs().next();
-         i < state.configs().size();
-         i = state.configs().next(i + 1))
-    {
-        configs.emplace_back(current->configs[i].second, biddableSpots[i]);
-    }
+    ConfigList result;
+    for (size_t i = configs.next(); i < configs.size(); i = configs.next(i + 1))
+        result.emplace_back(current->configs[i].second, biddableSpots[i]);
 
-    return configs;
+    return result;
 }
 
 
@@ -103,6 +129,8 @@ addFilter(const string& name)
         newData.reset(new Data(*oldData));
         newData->addFilter(FilterRegistry::makeFilter(name));
     } while (!setData(oldData, newData));
+
+    if (events) events->recordHit("filters.addFilter.%s", name);
 }
 
 
@@ -119,6 +147,8 @@ removeFilter(const string& name)
         newData.reset(new Data(*oldData));
         newData->removeFilter(name);
     } while (!setData(oldData, newData));
+
+    if (events) events->recordHit("filters.removeFilter.%s", name);
 }
 
 
@@ -135,6 +165,8 @@ addConfig(const string& name, const shared_ptr<AgentConfig>& config)
         newData.reset(new Data(*oldData));
         newData->addConfig(name, config);
     } while (!setData(oldData, newData));
+
+    if (events) events->recordHit("filters.addConfig.%s", name);
 }
 
 
@@ -151,6 +183,8 @@ removeConfig(const string& name)
         newData.reset(new Data(*oldData));
         newData->removeConfig(name);
     } while (!setData(oldData, newData));
+
+    if (events) events->recordHit("filters.removeConfig.%s", name);
 }
 
 

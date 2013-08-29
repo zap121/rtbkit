@@ -17,8 +17,13 @@
 #include <string>
 
 
-namespace RTBKIT {
+namespace Datacratic {
 
+struct EventRecorder;
+
+} // namespace Datacratic
+
+namespace RTBKIT {
 
 struct BidRequest;
 struct ExchangeConnector;
@@ -33,11 +38,15 @@ struct FilterPool
 {
     ~FilterPool();
 
+    void init(EventRecorder* events = nullptr);
 
     typedef std::pair<std::shared_ptr<AgentConfig>, BiddableSpots> ConfigEntry;
     typedef std::vector<ConfigEntry> ConfigList;
 
-    ConfigList filter(const BidRequest& br, const ExchangeConnector* conn);
+    ConfigList filter(
+            const BidRequest& br,
+            const ExchangeConnector* conn,
+            const ConfigSet& mask = ConfigSet(true));
 
 
     // \todo Need batch interfaces of these to alleviate overhead.
@@ -79,10 +88,13 @@ private:
     };
 
     bool setData(Data*&, std::unique_ptr<Data>&);
+    void record(const Data* data, const FilterBase* f, const ConfigSet& diff);
 
     std::atomic<Data*> data;
     std::vector< std::shared_ptr<AgentConfig> > configs;
     Datacratic::GcLock gc;
+
+    EventRecorder* events;
 };
 
 } // namespace RTBKIT
