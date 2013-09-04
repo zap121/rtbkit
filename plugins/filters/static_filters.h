@@ -336,6 +336,9 @@ private:
 /* REQUIRED IDS FILTER                                                        */
 /******************************************************************************/
 
+/** \todo This filter has not been tested and is disabled from the static
+    constructor.
+ */
 struct RequiredIdsFilter : public FilterBaseT<RequiredIdsFilter>
 {
     static constexpr const char* name = "RequireIds";
