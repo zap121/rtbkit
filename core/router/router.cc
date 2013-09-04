@@ -1765,7 +1765,7 @@ doBid(const std::vector<std::string> & message)
     auto returnInvalidBid = [&] (int i, const char * reason,
                                  const char * message, ...)
         {
-            this->recordHit("bidErrors.%s");
+            this->recordHit("bidErrors.%s", reason);
             this->recordHit("accounts.%s.bidErrors.total",
                             config.account.toString('.'));
             this->recordHit("accounts.%s.bidErrors.%s",
