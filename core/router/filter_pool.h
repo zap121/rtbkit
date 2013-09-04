@@ -36,11 +36,34 @@ struct AgentConfig;
 
 struct FilterPool
 {
+    FilterPool();
     ~FilterPool();
 
     void init(EventRecorder* events = nullptr);
 
-    typedef std::pair<std::shared_ptr<AgentConfig>, BiddableSpots> ConfigEntry;
+    struct ConfigEntry
+    {
+        ConfigEntry(
+                std::string name,
+                std::shared_ptr<AgentConfig> config,
+                std::shared_ptr<AgentStats> stats) :
+            name(std::move(name)),
+            config(std::move(config)),
+            stats(std::move(stats))
+        {}
+
+        void reset()
+        {
+            name = "";
+            config.reset();
+            stats.reset();
+        }
+
+        std::string name;
+        std::shared_ptr<AgentConfig> config;
+        std::shared_ptr<AgentStats> stats;
+        BiddableSpots biddableSpots;
+    };
     typedef std::vector<ConfigEntry> ConfigList;
 
     ConfigList filter(
@@ -54,8 +77,10 @@ struct FilterPool
     void removeFilter(const std::string& name);
 
     // \todo Need batch interfaces to alleviate overhead.
-    void addConfig(
-            const std::string& name, const std::shared_ptr<AgentConfig>& config);
+    unsigned addConfig(
+            const std::string& name,
+            const std::shared_ptr<AgentConfig>& config,
+            const std::shared_ptr<AgentStats>& stats);
     void removeConfig(const std::string& name);
 
     static void initWithDefaultFilters(FilterPool& pool);
@@ -69,9 +94,10 @@ private:
         ~Data();
 
         ssize_t findConfig(const std::string& name) const;
-        void addConfig(
+        unsigned addConfig(
                 const std::string& name,
-                const std::shared_ptr<AgentConfig>& config);
+                const std::shared_ptr<AgentConfig>& config,
+                const std::shared_ptr<AgentStats>& stats);
         void removeConfig(const std::string& name);
 
         ssize_t findFilter(const std::string& name) const;
@@ -81,9 +107,7 @@ private:
         // \todo Use unique_ptr when moving to gcc 4.7
         std::vector<FilterBase*> filters;
 
-        typedef std::pair<std::string, std::shared_ptr<AgentConfig> > ConfigEntry;
         std::vector<ConfigEntry> configs;
-
         std::vector<unsigned> activeConfigs;
     };
 

@@ -25,6 +25,9 @@ namespace RTBKIT {
 /* FILTER POOL                                                                */
 /******************************************************************************/
 
+FilterPool::
+FilterPool() : data(new Data()), events(nullptr) {}
+
 void
 FilterPool::
 initWithDefaultFilters(FilterPool& pool)
@@ -74,9 +77,9 @@ FilterPool::
 record(const Data* data, const FilterBase* filter, const ConfigSet& diff)
 {
     for (size_t cfg = diff.next(); cfg < diff.size(); cfg = diff.next(cfg+1)) {
-        const AgentConfig& config = *data->configs[cfg].second;
+        const AgentConfig& config = *data->configs[cfg].config;
 
-        events->recordHit("accounts.%s.filter.%03d_%s",
+        events->recordHit("accounts.%s.filter.static.%04x_%s",
                 config.account.toString('.'),
                 filter->priority(), filter->name());
     }
@@ -109,8 +112,11 @@ filter(const BidRequest& br, const ExchangeConnector* conn, const ConfigSet& mas
     configs = state.configs();
 
     ConfigList result;
-    for (size_t i = configs.next(); i < configs.size(); i = configs.next(i + 1))
-        result.emplace_back(current->configs[i].second, biddableSpots[i]);
+    for (size_t i = configs.next(); i < configs.size(); i = configs.next(i + 1)) {
+        ConfigEntry entry = current->configs[i];
+        entry.biddableSpots = std::move(biddableSpots[i]);
+        result.emplace_back(std::move(entry));
+    }
 
     return result;
 }
@@ -152,21 +158,27 @@ removeFilter(const string& name)
 }
 
 
-void
+unsigned
 FilterPool::
-addConfig(const string& name, const shared_ptr<AgentConfig>& config)
+addConfig(
+        const string& name,
+        const shared_ptr<AgentConfig>& config,
+        const shared_ptr<AgentStats>& stats)
 {
     GcLockBase::SharedGuard guard(gc);
 
     unique_ptr<Data> newData;
     Data* oldData = data.load();
+    unsigned index;
 
     do {
         newData.reset(new Data(*oldData));
-        newData->addConfig(name, config);
+        index = newData->addConfig(name, config, stats);
     } while (!setData(oldData, newData));
 
     if (events) events->recordHit("filters.addConfig.%s", name);
+
+    return index;
 }
 
 
@@ -214,14 +226,17 @@ FilterPool::Data::
 findConfig(const string& name) const
 {
     for (size_t i = 0; i < configs.size(); ++i) {
-        if (configs[i].first == name) return i;
+        if (configs[i].name == name) return i;
     }
     return -1;
 }
 
-void
+unsigned
 FilterPool::Data::
-addConfig(const string& name, const shared_ptr<AgentConfig>& config)
+addConfig(
+        const string& name,
+        const shared_ptr<AgentConfig>& config,
+        const shared_ptr<AgentStats>& stats)
 {
     // If our config already exists, we have to deregister it with the filters
     // before we can add the new config.
@@ -229,15 +244,20 @@ addConfig(const string& name, const shared_ptr<AgentConfig>& config)
 
     ssize_t index = findConfig("");
     if (index >= 0)
-        configs[index] = make_pair(name, config);
+        configs[index] = ConfigEntry(name, config, stats);
     else {
         index = configs.size();
-        configs.emplace_back(make_pair(name, config));
+        configs.emplace_back(name, config, stats);
     }
 
+    if (index >= activeConfigs.size())
+        activeConfigs.resize(index + 1);
     activeConfigs[index] = config->creatives.size();
+
     for (FilterBase* filter : filters)
         filter->addConfig(index, config);
+
+    return index;
 }
 
 void
@@ -249,10 +269,9 @@ removeConfig(const string& name)
 
     activeConfigs[index] = 0;
     for (FilterBase* filter : filters)
-        filter->removeConfig(index, configs[index].second);
+        filter->removeConfig(index, configs[index].config);
 
-    configs[index].first = "";
-    configs[index].second.reset();
+    configs[index].reset();
 }
 
 
