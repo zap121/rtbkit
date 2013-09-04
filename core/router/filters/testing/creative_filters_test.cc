@@ -10,7 +10,7 @@
 #define BOOST_TEST_DYN_LINK
 
 #include "utils.h"
-#include "rtbkit/plugins/filters/creative_filters.h"
+#include "rtbkit/core/router/filters/creative_filters.h"
 #include "rtbkit/core/agent_configuration/agent_config.h"
 #include "rtbkit/common/bid_request.h"
 #include "rtbkit/common/exchange_connector.h"

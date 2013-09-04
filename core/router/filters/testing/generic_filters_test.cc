@@ -10,7 +10,7 @@
 #define BOOST_TEST_DYN_LINK
 
 #include "utils.h"
-#include "rtbkit/plugins/filters/generic_filters.h"
+#include "rtbkit/core/router/filters/generic_filters.h"
 
 #include <boost/test/unit_test.hpp>
 

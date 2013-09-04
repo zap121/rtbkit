@@ -17,7 +17,7 @@
 #define BOOST_TEST_DYN_LINK
 
 #include "utils.h"
-#include "rtbkit/plugins/filters/static_filters.h"
+#include "rtbkit/core/router/filters/static_filters.h"
 #include "rtbkit/core/agent_configuration/agent_config.h"
 #include "rtbkit/common/bid_request.h"
 #include "rtbkit/common/exchange_connector.h"
@@ -44,6 +44,10 @@ void check(
        on this subject, let's just fudge it here and call it a day.
      */
     request.exchange = exchangeName;
+
+    // A bid request without ad spots doesn't really make any sense and will
+    // accidently make state.configs() to return an empty set.
+    request.imp.emplace_back();
 
     vector<unsigned> creativesCount;
     for (size_t i = mask.next(); i < mask.size(); i = mask.next(i+1)) {
