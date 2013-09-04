@@ -238,7 +238,7 @@ struct ExchangePreFilter : public IterativeFilter<ExchangePreFilter>
 
     bool filterConfig(FilterState& state, const AgentConfig& config) const
     {
-        if (!state.exchange) return true;
+        if (!state.exchange) return false;
 
         const void * exchangeInfo = nullptr;
 
@@ -262,7 +262,7 @@ struct ExchangePostFilter : public IterativeFilter<ExchangePostFilter>
 
     bool filterConfig(FilterState& state, const AgentConfig& config) const
     {
-        if (!state.exchange) return true;
+        if (!state.exchange) return false;
 
         const void * exchangeInfo = nullptr;
 

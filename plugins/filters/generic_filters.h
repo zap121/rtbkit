@@ -84,7 +84,7 @@ struct IterativeFilter : public FilterBaseT<Filter>
         {
             ExcAssert(configs[i]);
 
-            if (!filterConfig(state, *configs[i])) continue;
+            if (filterConfig(state, *configs[i])) continue;
             matches.reset(i);
         }
 

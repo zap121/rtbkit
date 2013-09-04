@@ -198,13 +198,14 @@ struct CreativeExchangeFilter : public IterativeFilter<CreativeExchangeFilter>
             for (size_t crId = 0; crId < config.creatives.size(); ++crId) {
                 const auto& creative = config.creatives[crId];
 
-                const void * exchangeInfo = getExchangeInfo(state, creative);
-                if (!exchangeInfo) continue;
+                auto exchangeInfo = getExchangeInfo(state, creative);
+                if (!exchangeInfo.first) continue;
 
                 bool ret = state.exchange->bidRequestCreativeFilter(
-                        state.request, config, exchangeInfo);
+                        state.request, config, exchangeInfo.second);
 
                 if (ret) creatives.set(crId, cfgId);
+
             }
         }
 
@@ -213,12 +214,15 @@ struct CreativeExchangeFilter : public IterativeFilter<CreativeExchangeFilter>
 
 private:
 
-    const void* getExchangeInfo(
-            const FilterState& state, const Creative& creative) const
+    const std::pair<bool, void*>
+    getExchangeInfo(const FilterState& state, const Creative& creative) const
     {
         std::lock_guard<ML::Spinlock> guard(creative.lock);
         auto it = creative.providerData.find(state.exchange->exchangeName());
-        return it == creative.providerData.end() ? nullptr : it->second.get();
+
+        if (it == creative.providerData.end())
+            return std::make_pair(false, nullptr);
+        return std::make_pair(true, it->second.get());
     }
 };
 
