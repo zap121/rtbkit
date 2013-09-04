@@ -13,6 +13,6 @@ LIB_FILTERS_SOURCES := \
 LIB_FILTERS_LINK := \
 	arch utils filter_registry agent_configuration rtb
 
-$(eval $(call library,filters,$(LIB_FILTERS_SOURCES),$(LIB_FILTERS_LINK)))
+$(eval $(call library,static_filters,$(LIB_FILTERS_SOURCES),$(LIB_FILTERS_LINK)))
 
 $(eval $(call include_sub_make,filters_test,testing,filters_test.mk))

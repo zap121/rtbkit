@@ -6,8 +6,8 @@
 # Makefile for the various filter tests.
 #------------------------------------------------------------------------------#
 
-$(eval $(call test,generic_filters_test,filters,boost))
-$(eval $(call test,static_filters_test,filters,boost))
-$(eval $(call test,creative_filters_test,filters,boost))
+$(eval $(call test,generic_filters_test,static_filters,boost))
+$(eval $(call test,static_filters_test,static_filters,boost))
+$(eval $(call test,creative_filters_test,static_filters,boost))
 
 
