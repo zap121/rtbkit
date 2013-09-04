@@ -323,13 +323,16 @@ struct FilterState
     const BidRequest& request;
     const ExchangeConnector * const exchange;
 
-    const ConfigSet& configs() const { return configs_; }
+    ConfigSet configs() const
+    {
+        CreativeMatrix mask;
+        for (const CreativeMatrix& matrix : creatives_) mask |= matrix;
+        return configs_ & mask.aggregate();
+    }
     void narrowConfigs(const ConfigSet& mask) { configs_ &= mask; }
 
     CreativeMatrix creatives(unsigned impId) const
     {
-        using namespace std;
-
         CreativeMatrix mask(configs_);
         mask &= creatives_[impId];
         return mask;
