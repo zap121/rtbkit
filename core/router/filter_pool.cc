@@ -97,6 +97,8 @@ filter(const BidRequest& br, const ExchangeConnector* conn, const ConfigSet& mas
     state.narrowConfigs(mask);
     ConfigSet configs = state.configs();
 
+    ExcCheck(!current->filters.empty(), "No filters registered");
+
     for (FilterBase* filter : current->filters) {
         filter->filter(state);
 
