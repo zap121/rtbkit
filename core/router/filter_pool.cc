@@ -102,12 +102,14 @@ filter(const BidRequest& br, const ExchangeConnector* conn, const ConfigSet& mas
     for (FilterBase* filter : current->filters) {
         filter->filter(state);
 
+        ConfigSet current = state.configs();
+
         if (events) {
-            record(data, filter, configs ^ state.configs());
-            configs = state.configs();
+            record(data, filter, configs ^ current);
+            configs = current;
         }
 
-        if (state.configs().empty()) break;
+        if (current.empty()) break;
     }
 
     auto biddableSpots = state.biddableSpots();

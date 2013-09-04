@@ -26,9 +26,6 @@ namespace RTBKIT {
 /* SEGMENTS FILTER                                                            */
 /******************************************************************************/
 
-/** \todo weights and exchanges.
-
- */
 struct SegmentsFilter : public FilterBaseT<SegmentsFilter>
 {
     static constexpr const char* name = "Segments";

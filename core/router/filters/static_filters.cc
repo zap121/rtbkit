@@ -51,6 +51,8 @@ ConfigSet
 SegmentsFilter::SegmentData::
 applyExchangeFilter(FilterState& state, const ConfigSet& result) const
 {
+    ConfigSet current = state.configs();
+
     /* This is a bit tricky because our filter mechanism doesn't gracefully
        support skipping filters which is required for the exchange IE. So
        instead we'll take the result of the original filter and massage it until
@@ -59,7 +61,7 @@ applyExchangeFilter(FilterState& state, const ConfigSet& result) const
        First off, let's figure out which configs would change from 1 to 0 if we
        applied result to the state.
     */
-    ConfigSet affected = state.configs() ^ (state.configs() & result);
+    ConfigSet affected = current ^ (current & result);
     if (affected.empty()) return ConfigSet(true);
 
     /* Out of those configs, let's remove the ones that we should skip. Note
