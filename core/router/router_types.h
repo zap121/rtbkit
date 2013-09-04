@@ -123,7 +123,7 @@ struct AgentInfo {
     
     bool configured;
     unsigned filterIndex;
-    std::shared_ptr<const AgentConfig> config;
+    std::shared_ptr<AgentConfig> config;
     std::shared_ptr<AgentStatus> status;
     std::shared_ptr<AgentStats> stats;
     double throttleProbability;
