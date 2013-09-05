@@ -73,6 +73,7 @@ FilterPool::
     gc.deferBarrier();
 }
 
+
 void
 FilterPool::
 recordDiff(const Data* data, const FilterBase* filter, const ConfigSet& diff)
@@ -91,7 +92,8 @@ FilterPool::
 recordTime(uint64_t start, const FilterBase* filter)
 {
     uint64_t now = ticks();
-    double us = ((now - start) / ticks_per_second) * 1000000.0;
+    double us = ((now - start - ticks_overhead) / ticks_per_second) * 1000000.0;
+    us /= StatsFrequency;
 
     events->recordLevel(
             us, "filters.timingUs.%04x_%s", filter->priority(), filter->name());
@@ -120,13 +122,14 @@ filter(const BidRequest& br, const ExchangeConnector* conn, const ConfigSet& mas
 
         ConfigSet current = state.configs();
 
-        if (events) {
+        if (events && (random() % StatsFrequency == 0)) {
             recordDiff(data, filter, configs ^ current);
             configs = current;
+
+            ticksStart = recordTime(ticksStart, filter);
         }
 
         if (current.empty()) break;
-        if (events) ticksStart = recordTime(ticksStart, filter);
     }
 
     auto biddableSpots = state.biddableSpots();
