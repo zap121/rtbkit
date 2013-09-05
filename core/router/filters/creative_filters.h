@@ -153,13 +153,13 @@ struct CreativeExchangeNameFilter :
     void addCreative(
             unsigned cfgIndex, unsigned crIndex, const Creative& creative)
     {
-        impl.addIncludeExclude(cfgIndex, crIndex, creative.languageFilter);
+        impl.addIncludeExclude(cfgIndex, crIndex, creative.exchangeFilter);
     }
 
     void removeCreative(
             unsigned cfgIndex, unsigned crIndex, const Creative& creative)
     {
-        impl.removeIncludeExclude(cfgIndex, crIndex, creative.languageFilter);
+        impl.removeIncludeExclude(cfgIndex, crIndex, creative.exchangeFilter);
     }
 
     void filter(FilterState& state) const
