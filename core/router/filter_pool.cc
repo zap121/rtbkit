@@ -197,7 +197,7 @@ addConfig(
         index = newData->addConfig(name, config, stats);
     } while (!setData(oldData, newData));
 
-    if (events) events->recordHit("filters.addConfig.%s", name);
+    if (events) events->recordHit("filters.addConfig");
 
     return index;
 }
@@ -217,7 +217,7 @@ removeConfig(const string& name)
         newData->removeConfig(name);
     } while (!setData(oldData, newData));
 
-    if (events) events->recordHit("filters.removeConfig.%s", name);
+    if (events) events->recordHit("filters.removeConfig");
 }
 
 
