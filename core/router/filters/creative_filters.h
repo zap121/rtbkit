@@ -112,8 +112,8 @@ private:
 
 struct CreativeLocationFilter : public CreativeFilter<CreativeLocationFilter>
 {
-    static constexpr const char* name = "CreativeLanguage";
-    unsigned priority() const { return Priority::CreativeLanguage; }
+    static constexpr const char* name = "CreativeLocation";
+    unsigned priority() const { return Priority::CreativeLocation; }
 
     void addCreative(
             unsigned cfgIndex, unsigned crIndex, const Creative& creative)
