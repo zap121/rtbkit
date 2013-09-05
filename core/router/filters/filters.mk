@@ -4,7 +4,10 @@
 # Copyright (c) 2013 Datacratic.  All rights reserved.
 #
 # Router filter makefile
-#------------------------------------------------------------------------------#
+#
+# WARNING: This makefile is currently not being because of a bug in # jml-build.
+# See the parent makefile for the actual build targets.
+# ------------------------------------------------------------------------------#
 
 LIB_FILTERS_SOURCES := \
 	static_filters.cc \
