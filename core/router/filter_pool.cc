@@ -12,6 +12,7 @@
 #include "rtbkit/core/agent_configuration/agent_config.h"
 #include "soa/service/service_base.h"
 #include "jml/utils/exc_check.h"
+#include "jml/arch/tick_counter.h"
 
 
 using namespace std;
@@ -74,7 +75,7 @@ FilterPool::
 
 void
 FilterPool::
-record(const Data* data, const FilterBase* filter, const ConfigSet& diff)
+recordDiff(const Data* data, const FilterBase* filter, const ConfigSet& diff)
 {
     for (size_t cfg = diff.next(); cfg < diff.size(); cfg = diff.next(cfg+1)) {
         const AgentConfig& config = *data->configs[cfg].config;
@@ -85,6 +86,20 @@ record(const Data* data, const FilterBase* filter, const ConfigSet& diff)
     }
 }
 
+uint64_t
+FilterPool::
+recordTime(uint64_t start, const FilterBase* filter)
+{
+    uint64_t now = ticks();
+    double us = ((now - start) / ticks_per_second) * 1000000.0;
+
+    events->recordLevel(
+            us, "filters.timingUs.%04x_%s", filter->priority(), filter->name());
+
+    return now;
+}
+
+
 FilterPool::ConfigList
 FilterPool::
 filter(const BidRequest& br, const ExchangeConnector* conn, const ConfigSet& mask)
@@ -92,12 +107,13 @@ filter(const BidRequest& br, const ExchangeConnector* conn, const ConfigSet& mas
     GcLockBase::SharedGuard guard(gc, GcLockBase::RD_NO);
 
     const Data* current = data.load();
-    FilterState state(br, conn, current->activeConfigs);
-
-    state.narrowConfigs(mask);
-    ConfigSet configs = state.configs();
-
     ExcCheck(!current->filters.empty(), "No filters registered");
+
+    FilterState state(br, conn, current->activeConfigs);
+    state.narrowConfigs(mask);
+
+    ConfigSet configs = state.configs();
+    uint64_t ticksStart = ticks();
 
     for (FilterBase* filter : current->filters) {
         filter->filter(state);
@@ -105,11 +121,12 @@ filter(const BidRequest& br, const ExchangeConnector* conn, const ConfigSet& mas
         ConfigSet current = state.configs();
 
         if (events) {
-            record(data, filter, configs ^ current);
+            recordDiff(data, filter, configs ^ current);
             configs = current;
         }
 
         if (current.empty()) break;
+        if (events) ticksStart = recordTime(ticksStart, filter);
     }
 
     auto biddableSpots = state.biddableSpots();

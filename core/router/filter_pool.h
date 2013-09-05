@@ -112,7 +112,8 @@ private:
     };
 
     bool setData(Data*&, std::unique_ptr<Data>&);
-    void record(const Data* data, const FilterBase* f, const ConfigSet& diff);
+    void recordDiff(const Data* data, const FilterBase* f, const ConfigSet& diff);
+    uint64_t recordTime(uint64_t ticks, const FilterBase* filter);
 
     std::atomic<Data*> data;
     std::vector< std::shared_ptr<AgentConfig> > configs;
