@@ -323,12 +323,7 @@ struct FilterState
     const BidRequest& request;
     const ExchangeConnector * const exchange;
 
-    ConfigSet configs() const
-    {
-        CreativeMatrix mask;
-        for (const CreativeMatrix& matrix : creatives_) mask |= matrix;
-        return configs_ & mask.aggregate();
-    }
+    const ConfigSet& configs() const { return configs_; }
     void narrowConfigs(const ConfigSet& mask) { configs_ &= mask; }
 
     CreativeMatrix creatives(unsigned impId) const
@@ -341,12 +336,13 @@ struct FilterState
     void narrowCreativesForImp(unsigned impId, const CreativeMatrix& mask)
     {
         creatives_[impId] &= mask;
+        updateConfigs();
     }
 
     void narrowAllCreatives(const CreativeMatrix& mask)
     {
-        for (CreativeMatrix& matrix : creatives_)
-            matrix &= mask;
+        for (CreativeMatrix& matrix : creatives_) matrix &= mask;
+        updateConfigs();
     }
 
 
@@ -356,6 +352,13 @@ struct FilterState
     std::unordered_map<unsigned, BiddableSpots> biddableSpots();
 
 private:
+    void updateConfigs()
+    {
+        CreativeMatrix mask;
+        for (const CreativeMatrix& matrix : creatives_) mask |= matrix;
+        configs_ &= mask.aggregate();
+    }
+
     ConfigSet configs_;
     ML::compact_vector<CreativeMatrix, 8> creatives_;
 };
