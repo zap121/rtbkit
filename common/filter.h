@@ -189,7 +189,7 @@ struct ConfigSet
     }
 
 private:
-    ML::compact_vector<Word, 2> bitfield;
+    ML::compact_vector<Word, 8> bitfield;
     Word defaultValue;
 };
 
@@ -304,7 +304,7 @@ struct CreativeMatrix
     }
 
 private:
-    ML::compact_vector<ConfigSet, 8> matrix;
+    ML::compact_vector<ConfigSet, 16> matrix;
     ConfigSet defaultValue;
 };
 
@@ -357,7 +357,7 @@ struct FilterState
 
 private:
     ConfigSet configs_;
-    ML::compact_vector<CreativeMatrix, 4> creatives_;
+    ML::compact_vector<CreativeMatrix, 8> creatives_;
 };
 
 
