@@ -189,6 +189,8 @@ addConfig(
         const shared_ptr<AgentConfig>& config,
         const shared_ptr<AgentStats>& stats)
 {
+    ExcAssert(config.get());
+
     GcLockBase::SharedGuard guard(gc);
 
     unique_ptr<Data> newData;
