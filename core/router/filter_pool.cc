@@ -93,7 +93,6 @@ recordTime(uint64_t start, const FilterBase* filter)
 {
     uint64_t now = ticks();
     double us = ((now - start - ticks_overhead) / ticks_per_second) * 1000000.0;
-    us /= StatsFrequency;
 
     events->recordLevel(
             us, "filters.timingUs.%04x_%s", filter->priority(), filter->name());
@@ -115,18 +114,19 @@ filter(const BidRequest& br, const ExchangeConnector* conn, const ConfigSet& mas
     state.narrowConfigs(mask);
 
     ConfigSet configs = state.configs();
-    uint64_t ticksStart = ticks();
+
+    bool sampleStats = events && (random() % 10 == 0);
+    uint64_t ticksStart = sampleStats ? ticks() : 0;
 
     for (FilterBase* filter : current->filters) {
         filter->filter(state);
 
         ConfigSet current = state.configs();
 
-        if (events && (random() % StatsFrequency == 0)) {
+        if (sampleStats) {
+            ticksStart = recordTime(ticksStart, filter);
             recordDiff(data, filter, configs ^ current);
             configs = current;
-
-            ticksStart = recordTime(ticksStart, filter);
         }
 
         if (current.empty()) break;

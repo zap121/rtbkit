@@ -87,8 +87,6 @@ struct FilterPool
 
 private:
 
-    enum { StatsFrequency = 10 };
-
     struct Data
     {
         Data() {}
