@@ -2423,7 +2423,6 @@ configureAgentOnExchange(std::shared_ptr<ExchangeConnector> const & exchange,
 {
     auto name = exchange->exchangeName();
 
-    cerr << "scanning campaign with exchange " << name << endl;
     auto ecomp = exchange->getCampaignCompatibility(config, includeReasons);
     if(!ecomp.isCompatible) {
         cerr << "campaign not compatible: " << ecomp.reasons << endl;
