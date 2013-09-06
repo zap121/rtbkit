@@ -250,11 +250,11 @@ BOOST_AUTO_TEST_CASE(filterStateTest)
         cerr << "[basic]_______________________________________________________"
             << endl;
 
-        vector<unsigned> creativeCounts;
+        CreativeMatrix activeConfigs;
         for (size_t i = 0; i < configs; ++i)
-            creativeCounts.push_back(creatives);
+            activeConfigs.setConfig(i, creatives);
 
-        FilterState state(br, ex, creativeCounts);
+        FilterState state(br, ex, activeConfigs);
         checkBiddableSpots(state);
     }
 
@@ -262,11 +262,11 @@ BOOST_AUTO_TEST_CASE(filterStateTest)
         cerr << "[diag]________________________________________________________"
             << endl;
 
-        vector<unsigned> creativeCounts;
+        CreativeMatrix activeConfigs;
         for (size_t i = 0; i < configs; ++i)
-            creativeCounts.push_back(i);
+            activeConfigs.setConfig(i, i);
 
-        FilterState state(br, ex, creativeCounts);
+        FilterState state(br, ex, activeConfigs);
         checkBiddableSpots(state);
 
         CreativeMatrix mask;
@@ -282,11 +282,11 @@ BOOST_AUTO_TEST_CASE(filterStateTest)
         cerr << "[per-imp]___________________________________________________"
             << endl;
 
-        vector<unsigned> creativeCounts;
+        CreativeMatrix activeConfigs;
         for (size_t i = 0; i < configs; ++i)
-            creativeCounts.push_back(configs - i);
+            activeConfigs.setConfig(i, configs - i);
 
-        FilterState state(br, ex, creativeCounts);
+        FilterState state(br, ex, activeConfigs);
 
         for (size_t imp = 0; imp < spots; ++imp) {
             CreativeMatrix mask;

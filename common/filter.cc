@@ -26,26 +26,6 @@ namespace RTBKIT {
 /* FILTER STATE                                                               */
 /******************************************************************************/
 
-FilterState::
-FilterState(
-        const BidRequest& br,
-        const ExchangeConnector* ex,
-        const std::vector<unsigned>& creativeCounts) :
-    request(br),
-    exchange(ex)
-{
-    CreativeMatrix defaultMatrix;
-
-    for (size_t cfg = 0; cfg < creativeCounts.size(); ++cfg) {
-        if (creativeCounts[cfg]) configs_.set(cfg);
-
-        for (size_t crId = 0; crId < creativeCounts[cfg]; ++crId)
-            defaultMatrix.set(crId, cfg);
-    }
-
-    creatives_.resize(br.imp.size(), defaultMatrix);
-}
-
 std::unordered_map<unsigned, BiddableSpots>
 FilterState::
 biddableSpots()

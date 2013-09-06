@@ -276,9 +276,7 @@ addConfig(
         configs.emplace_back(name, config, stats);
     }
 
-    if (index >= activeConfigs.size())
-        activeConfigs.resize(index + 1);
-    activeConfigs[index] = config->creatives.size();
+    activeConfigs.setConfig(index, config->creatives.size());
 
     for (FilterBase* filter : filters)
         filter->addConfig(index, config);
@@ -293,7 +291,8 @@ removeConfig(const string& name)
     ssize_t index = findConfig(name);
     if (index < 0) return;
 
-    activeConfigs[index] = 0;
+    activeConfigs.resetConfig(index);
+
     for (FilterBase* filter : filters)
         filter->removeConfig(index, configs[index].config);
 

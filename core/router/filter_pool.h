@@ -108,7 +108,7 @@ private:
         std::vector<FilterBase*> filters;
 
         std::vector<ConfigEntry> configs;
-        std::vector<unsigned> activeConfigs;
+        CreativeMatrix activeConfigs;
     };
 
     bool setData(Data*&, std::unique_ptr<Data>&);

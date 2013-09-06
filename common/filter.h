@@ -242,10 +242,23 @@ struct CreativeMatrix
         matrix[creative].set(config, value);
     }
 
+    void setConfig(size_t config, size_t numCreatives)
+    {
+        expand(numCreatives);
+        for (size_t cr = 0; cr < numCreatives; ++cr)
+            matrix[cr].set(config);
+    }
+
     void reset(size_t creative, size_t config)
     {
         expand(creative + 1);
         matrix[creative].reset(config);
+    }
+
+    void resetConfig(size_t config)
+    {
+        for (size_t cr = 0; cr < size(); ++cr)
+            matrix[cr].reset(config);
     }
 
 #define RTBKIT_CREATIVE_MATRIX_OP(_op_)                                 \
@@ -318,7 +331,14 @@ struct FilterState
     FilterState(
             const BidRequest& br,
             const ExchangeConnector* ex,
-            const std::vector<unsigned>& creativeCounts);
+            const CreativeMatrix& activeConfigs) :
+        request(br),
+        exchange(ex)
+    {
+        if (activeConfigs.size())
+            configs_ = activeConfigs[0];
+        creatives_.resize(br.imp.size(), activeConfigs);
+    }
 
     const BidRequest& request;
     const ExchangeConnector * const exchange;

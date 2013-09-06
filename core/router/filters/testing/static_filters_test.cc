@@ -49,14 +49,11 @@ void check(
     // accidently make state.configs() to return an empty set.
     request.imp.emplace_back();
 
-    vector<unsigned> creativesCount;
-    for (size_t i = mask.next(); i < mask.size(); i = mask.next(i+1)) {
-        if (creativesCount.size() <= i)
-            creativesCount.resize(i+1, 0);
-        creativesCount[i] = 1;
-    }
+    CreativeMatrix activeConfigs;
+    for (size_t i = mask.next(); i < mask.size(); i = mask.next(i+1))
+        activeConfigs.setConfig(i, 1);
 
-    FilterState state(request, &conn, creativesCount);
+    FilterState state(request, &conn, activeConfigs);
 
     filter.filter(state);
     check(state.configs() & mask, exp);

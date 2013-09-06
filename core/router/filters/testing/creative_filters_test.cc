@@ -30,7 +30,7 @@ using namespace Datacratic;
 void check(
         const FilterBase& filter,
         const BidRequest& request,
-        const vector<unsigned> creatives,
+        const CreativeMatrix& creatives,
         unsigned imp,
         const std::vector< std::vector<size_t> >& expected)
 {
@@ -57,22 +57,19 @@ void addImp(
 void addConfig(
         FilterBase& filter,
         unsigned cfgIndex, AgentConfig& cfg,
-        vector<unsigned>& counts)
+        CreativeMatrix& creatives)
 {
     addConfig(filter, cfgIndex, cfg);
-
-    if (counts.size() <= cfgIndex)
-        counts.resize(cfgIndex + 1, 0);
-    counts[cfgIndex] = cfg.creatives.size();
+    creatives.setConfig(cfgIndex, cfg.creatives.size());
 }
 
 void removeConfig(
         FilterBase& filter,
         unsigned cfgIndex, AgentConfig& cfg,
-        vector<unsigned>& counts)
+        CreativeMatrix& creatives)
 {
     removeConfig(filter, cfgIndex, cfg);
-    counts[cfgIndex] = 0;
+    creatives.resetConfig(cfgIndex);
 }
 
 
@@ -83,7 +80,7 @@ void removeConfig(
 BOOST_AUTO_TEST_CASE( testFormatFilter )
 {
     CreativeFormatFilter filter;
-    vector<unsigned> creatives;
+    CreativeMatrix creatives;
 
     AgentConfig c0;
     c0.creatives.push_back(Creative());
@@ -131,7 +128,7 @@ BOOST_AUTO_TEST_CASE( testFormatFilter )
 BOOST_AUTO_TEST_CASE( testLanguageFilter )
 {
     CreativeLanguageFilter filter;
-    vector<unsigned> creatives;
+    CreativeMatrix creatives;
 
     auto addCr = [] (AgentConfig& cfg, const IncludeExclude<string>& ie) {
         cfg.creatives.emplace_back();
