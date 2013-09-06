@@ -29,13 +29,15 @@ struct Priority
     static constexpr unsigned CreativeLocation     = 0x2100;
     static constexpr unsigned CreativeExchangeName = 0x2200;
     static constexpr unsigned CreativeLanguage     = 0x2300;
-    static constexpr unsigned CreativeExchange     = 0x2E00;
 
     static constexpr unsigned Segments             = 0x3000;
     static constexpr unsigned HourOfWeek           = 0x3100;
     static constexpr unsigned FoldPosition         = 0x3200;
     static constexpr unsigned RequiredIds          = 0x3300;
     static constexpr unsigned UserPartition        = 0x3400;
+
+    // Really slow so delay as much as possible.
+    static constexpr unsigned CreativeExchange     = 0xF100;
 
     static constexpr unsigned ExchangePost         = 0xFF00;
 };

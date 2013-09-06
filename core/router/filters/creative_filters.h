@@ -192,7 +192,10 @@ struct CreativeExchangeFilter : public IterativeFilter<CreativeExchangeFilter>
 
         CreativeMatrix creatives;
 
-        for (size_t cfgId = 0; cfgId < configs.size(); ++cfgId) {
+        for (size_t cfgId = state.configs().next();
+             cfgId < state.configs().size();
+             cfgId = state.configs().next(cfgId+1))
+        {
             const auto& config = *configs[cfgId];
 
             for (size_t crId = 0; crId < config.creatives.size(); ++crId) {
