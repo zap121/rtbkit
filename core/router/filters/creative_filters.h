@@ -220,7 +220,6 @@ private:
     const std::pair<bool, void*>
     getExchangeInfo(const FilterState& state, const Creative& creative) const
     {
-        std::lock_guard<ML::Spinlock> guard(creative.lock);
         auto it = creative.providerData.find(state.exchange->exchangeName());
 
         if (it == creative.providerData.end())

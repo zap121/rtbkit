@@ -237,18 +237,11 @@ struct ExchangePreFilter : public IterativeFilter<ExchangePreFilter>
     {
         if (!state.exchange) return false;
 
-        const void * exchangeInfo = nullptr;
-
-        {
-            std::lock_guard<ML::Spinlock> guard(config.lock);
-            auto it = config.providerData.find(state.exchange->exchangeName());
-            if (it == config.providerData.end()) return false;
-
-            exchangeInfo = it->second.get();
-        }
+        auto it = config.providerData.find(state.exchange->exchangeName());
+        if (it == config.providerData.end()) return false;
 
         return state.exchange->bidRequestPreFilter(
-                state.request, config, exchangeInfo);
+                state.request, config, it->second.get());
     }
 };
 
@@ -261,18 +254,11 @@ struct ExchangePostFilter : public IterativeFilter<ExchangePostFilter>
     {
         if (!state.exchange) return false;
 
-        const void * exchangeInfo = nullptr;
-
-        {
-            std::lock_guard<ML::Spinlock> guard(config.lock);
-            auto it = config.providerData.find(state.exchange->exchangeName());
-            if (it == config.providerData.end()) return false;
-
-            exchangeInfo = it->second.get();
-        }
+        auto it = config.providerData.find(state.exchange->exchangeName());
+        if (it == config.providerData.end()) return false;
 
         return state.exchange->bidRequestPostFilter(
-                state.request, config, exchangeInfo);
+                state.request, config, it->second.get());
     }
 };
 
