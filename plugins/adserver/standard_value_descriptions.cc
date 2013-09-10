@@ -1,4 +1,4 @@
-/* value_description.cc                                            -*- C++ -*-
+/* standard_value_descriptions.cc                                  -*- C++ -*-
    Wolfgang Sourdeau, September 2013
    Copyright (C) 2013 Datacratic.  All rights reserved.
 
