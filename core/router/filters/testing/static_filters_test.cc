@@ -7,10 +7,7 @@
     Note that these tests assume that the generic filters work properly so we
     don't waste time constructing complicated set of include/exclude statements.
 
-    \todo UserParitionFilter
     \todo HourOfTheWeek
-    \todo Exchange Pre/Post filter ???
-    \todo RequiredIdsFilter
  */
 
 #define BOOST_TEST_MAIN
@@ -437,4 +434,108 @@ BOOST_AUTO_TEST_CASE( userPartition )
     doCheck(r5, "ex1", { 2, 4 });
     doCheck(r6, "ex1", { 2 });
     doCheck(r7, "ex1", { 2 });
+}
+
+BOOST_AUTO_TEST_CASE( exchangeName )
+{
+    ExchangeNameFilter filter;
+    ConfigSet mask;
+
+    auto doCheck = [&] (
+            BidRequest& request,
+            const string& exchangeName,
+            const initializer_list<size_t>& expected)
+    {
+        check(filter, request, exchangeName, mask, expected);
+    };
+
+    AgentConfig c0;
+    c0.exchangeFilter = ie<string>({ "appnexus", "context_web", "casale" }, {});
+
+    BidRequest req;
+
+    title("exchangeName-1");
+    addConfig(filter, 0, c0); mask.set(0);
+
+    doCheck(req, "appnexus", { 0 });
+    doCheck(req, "adx", { });
+}
+
+BOOST_AUTO_TEST_CASE( requiredIds )
+{
+    RequiredIdsFilter filter;
+    ConfigSet mask;
+
+    auto doCheck = [&] (
+            BidRequest& request,
+            const string& exchangeName,
+            const initializer_list<size_t>& expected)
+    {
+        check(filter, request, exchangeName, mask, expected);
+    };
+
+    auto set = [] (
+            BidRequest& request,
+            const std::initializer_list<std::string>& domains)
+    {
+        for (const auto& domain : domains)
+            request.userIds.add(Id(0), domain);
+    };
+
+    AgentConfig c0;
+    AgentConfig c1; c1.requiredIds = { "d0", "d1" };
+    AgentConfig c2; c2.requiredIds = { "d1", "d2" };
+    AgentConfig c3; c3.requiredIds = { "d2" };
+    AgentConfig c4; c4.requiredIds = { "d3" };
+
+    BidRequest r0;
+    BidRequest r1; set(r1, { "d1" });
+    BidRequest r2; set(r2, { "d1", "d2" });
+    BidRequest r3; set(r3, { "d2", "d3" });
+    BidRequest r4; set(r4, { "d0", "d1", "d2" });
+    BidRequest r5; set(r5, { "d5" });
+
+    title("requiredIds-1");
+    addConfig(filter, 0, c0); mask.set(0);
+    addConfig(filter, 1, c1); mask.set(1);
+    addConfig(filter, 2, c2); mask.set(2);
+    addConfig(filter, 3, c3); mask.set(3);
+    addConfig(filter, 4, c4); mask.set(4);
+
+    doCheck(r0, "ex1", { 0 });
+    doCheck(r1, "ex1", { 0 });
+    doCheck(r2, "ex1", { 0, 2, 3 });
+    doCheck(r3, "ex1", { 0, 3, 4 });
+    doCheck(r4, "ex1", { 0, 1, 2, 3 });
+    doCheck(r5, "ex1", { 0 });
+
+    title("requiredIds-2");
+    removeConfig(filter, 2, c1); mask.reset(2);
+
+    doCheck(r0, "ex1", { 0 });
+    doCheck(r1, "ex1", { 0 });
+    doCheck(r2, "ex1", { 0, 3 });
+    doCheck(r3, "ex1", { 0, 3, 4 });
+    doCheck(r4, "ex1", { 0, 1, 3 });
+    doCheck(r5, "ex1", { 0 });
+
+    title("requiredIds-3");
+    removeConfig(filter, 0, c1); mask.reset(0);
+
+    doCheck(r0, "ex1", { });
+    doCheck(r1, "ex1", { });
+    doCheck(r2, "ex1", { 3 });
+    doCheck(r3, "ex1", { 3, 4 });
+    doCheck(r4, "ex1", { 1, 3 });
+    doCheck(r5, "ex1", { });
+
+    title("requiredIds-4");
+    removeConfig(filter, 3, c1); mask.reset(3);
+
+    doCheck(r0, "ex1", { });
+    doCheck(r1, "ex1", { });
+    doCheck(r2, "ex1", { });
+    doCheck(r3, "ex1", { 4 });
+    doCheck(r4, "ex1", { 1 });
+    doCheck(r5, "ex1", { });
 }

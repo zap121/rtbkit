@@ -280,7 +280,7 @@ struct ExchangeNameFilter : public FilterBaseT<ExchangeNameFilter>
 
     void filter(FilterState& state) const
     {
-        data.filter(state.request.exchange);
+        state.narrowConfigs(data.filter(state.request.exchange));
     }
 
 private:
@@ -319,9 +319,6 @@ private:
 /* REQUIRED IDS FILTER                                                        */
 /******************************************************************************/
 
-/** \todo This filter has not been tested and is disabled from the static
-    constructor.
- */
 struct RequiredIdsFilter : public FilterBaseT<RequiredIdsFilter>
 {
     static constexpr const char* name = "RequireIds";
@@ -349,7 +346,7 @@ struct RequiredIdsFilter : public FilterBaseT<RequiredIdsFilter>
             mask |= it->second;
         }
 
-        state.narrowConfigs(mask);
+        state.narrowConfigs(mask.negate());
     }
 
 private:
