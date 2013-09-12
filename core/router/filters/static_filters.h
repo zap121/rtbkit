@@ -164,7 +164,7 @@ struct HostFilter : public FilterBaseT<HostFilter>
 
     void filter(FilterState& state) const
     {
-        impl.filter(state.request.url);
+        state.narrowConfigs(impl.filter(state.request.url));
     }
 
 private:
