@@ -6,7 +6,7 @@
 
 #include "soa/types/basic_value_descriptions.h"
 
-#include "value_description.h"
+#include "standard_value_descriptions.h"
 
 using namespace std;
 using namespace RTBKIT;

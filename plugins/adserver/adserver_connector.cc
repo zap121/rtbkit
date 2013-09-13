@@ -12,6 +12,9 @@
 #include "rtbkit/common/auction_events.h"
 #include <dlfcn.h>
 
+#include "standard_events.h"
+
+
 using namespace std;
 
 namespace RTBKIT {

@@ -7,13 +7,16 @@
 #include "rtbkit/common/currency.h"
 #include "rtbkit/common/json_holder.h"
 
+#include "soa/types/value_description.h"
+
+#include "standard_value_descriptions.h"
+
 #include "standard_adserver_connector.h"
 
-
 using namespace std;
-
 using namespace boost::program_options;
 
+using namespace Datacratic;
 using namespace RTBKIT;
 
 
@@ -164,6 +167,24 @@ StandardAdServerConnector::
 handleDeliveryRq(const HttpHeader & header,
                  const Json::Value & json, const std::string & jsonStr)
 {
+    if (!json.isMember("event")) {
+        throw ML::Exception("'event' not specified");
+    }
+
+    StructuredJsonParsingContext ctx(json);
+    string event(json["event"].asString());
+
+    if (event == "click") {
+        auto clickEvent = Datacratic::jsonDecode<StandardClick>(json);
+    }
+    else if (event == "conversion") {
+        auto convEvent = Datacratic::jsonDecode<StandardConversion>(json);
+    }
+    else {
+        throw ML::Exception("unhandled event type: " + event);
+    }
+
+#if 0
     Date timestamp = Date::fromSecondsSinceEpoch(json["timestamp"].asDouble());
     Date bidTimestamp;
     if (json.isMember("bidTimestamp")) {
@@ -224,6 +245,7 @@ handleDeliveryRq(const HttpHeader & header,
     else {
         throw ML::Exception("invalid event type: '" + event + "'");
     }
+#endif
 }
 
 void
