@@ -81,7 +81,7 @@ recordDiff(const Data* data, const FilterBase* filter, const ConfigSet& diff)
     for (size_t cfg = diff.next(); cfg < diff.size(); cfg = diff.next(cfg+1)) {
         const AgentConfig& config = *data->configs[cfg].config;
 
-        events->recordHit("accounts.%s.filter.static.%04x_%s",
+        events->recordHit("accounts.%s.filter.static.%s",
                 config.account.toString('.'),
                 filter->priority(), filter->name());
     }
@@ -95,7 +95,7 @@ recordTime(uint64_t start, const FilterBase* filter)
     double us = ((now - start - ticks_overhead) / ticks_per_second) * 1000000.0;
 
     events->recordLevel(
-            us, "filters.timingUs.%04x_%s", filter->priority(), filter->name());
+            us, "filters.timingUs.%s", filter->priority(), filter->name());
 
     return now;
 }
@@ -129,7 +129,11 @@ filter(const BidRequest& br, const ExchangeConnector* conn, const ConfigSet& mas
             configs = filtered;
         }
 
-        if (filtered.empty()) break;
+        if (filtered.empty()) {
+            if (sampleStats) 
+                events->recordHit("filters.breakLoop.%s", filter->name());
+            break;
+        }
     }
 
     auto biddableSpots = state.biddableSpots();
