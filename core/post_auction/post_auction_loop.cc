@@ -1429,8 +1429,7 @@ doBidResult(const Id & auctionId,
                account.at(0, ""),
                adSpotId,
                account.toString(),
-               submission.bidRequestStrFormat,
-               winPrice.toString());
+               submission.bidRequestStrFormat);
 
     sendAgentMessage(response.agent, msg, timestamp,
                      confidence, auctionId,
