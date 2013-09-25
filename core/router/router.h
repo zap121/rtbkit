@@ -188,9 +188,9 @@ struct Router : public ServiceBase,
     /** Register the exchange with the router and make it take ownership of it */
     void addExchange(ExchangeConnector * exchange)
     {
-        loopMonitor.addCallback(
-                "exchanges." + exchange->exchangeName(),
-                exchange->getLoadSampleFn());
+        // loopMonitor.addCallback(
+        //         "exchanges." + exchange->exchangeName(),
+        //         exchange->getLoadSampleFn());
 
         Guard guard(lock);
         exchanges.push_back(std::shared_ptr<ExchangeConnector>(exchange));
@@ -203,9 +203,9 @@ struct Router : public ServiceBase,
     */
     void addExchange(ExchangeConnector & exchange)
     {
-        loopMonitor.addCallback(
-                "exchanges." + exchange.exchangeName(),
-                exchange.getLoadSampleFn());
+        // loopMonitor.addCallback(
+        //         "exchanges." + exchange.exchangeName(),
+        //         exchange.getLoadSampleFn());
 
         Guard guard(lock);
         exchanges.emplace_back(ML::make_unowned_std_sp(exchange));
@@ -221,9 +221,9 @@ struct Router : public ServiceBase,
     /** Register the exchange */
     void addExchange(std::shared_ptr<ExchangeConnector> const & exchange)
     {
-        loopMonitor.addCallback(
-                "exchanges." + exchange->exchangeName(),
-                exchange->getLoadSampleFn());
+        // loopMonitor.addCallback(
+        //         "exchanges." + exchange->exchangeName(),
+        //         exchange->getLoadSampleFn());
 
         Guard guard(lock);
         exchanges.push_back(exchange);
