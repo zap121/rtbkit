@@ -100,14 +100,14 @@ struct HttpExchangeConnector
         std::vector<double> lastSample;
 
         return [=] (double elapsed) mutable -> double {
-            auto sample = totalWorkSeconds();
+            auto sample = totalSleepSeconds();
 
             if (lastSample.size() < sample.size())
                 lastSample.resize(sample.size(), 0.0);
 
             double maxLoad = 0.0;
             for (size_t i = 0; i < sample.size(); ++i) {
-                double load = (sample[i] - lastSample[i]) / elapsed;
+                double load = 1.0 - ((sample[i] - lastSample[i]) / elapsed);
                 maxLoad = std::max(load, maxLoad);
             }
 
