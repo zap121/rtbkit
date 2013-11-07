@@ -145,6 +145,14 @@ struct rtbkit {
             rtbkit_send_event(&cfg.base);
         }
 
+        void send_bid(rtbkit_bid & bid) {
+            rtbkit_event_bid_response r;
+            r.base.type = RTBKIT_EVENT_BID_RESPONSE;
+            r.base.subject = handle;
+            r.bid = bid;
+            rtbkit_send_event(&r.base);
+        }
+
         virtual void on_bid_request(rtbkit_event_bid_request const & event) {
         }
 
@@ -258,15 +266,10 @@ struct my_bidding_agent : public rtbkit::bidding_agent {
     }
 
     void on_bid_request(rtbkit_event_bid_request const & event) {
-        // create a response
-        rtbkit_event_bid_response br;
-        br.base.type = RTBKIT_EVENT_BID_RESPONSE;
-        br.base.subject = event.base.subject;
-        br.bid.id = event.request.id;
-        br.bid.price = 1234;
-
-        // send back
-        rtbkit_send_event(&br.base);
+        rtbkit_bid bid;
+        bid.id = event.request.id;
+        bid.price = 1234;
+        send_bid(bid);
     }
 };
 
@@ -287,10 +290,8 @@ BOOST_AUTO_TEST_CASE( polling_api_cpp_test )
     // easy non blocking call
     #ifdef NON_BLOCKING
     for(;;) {
-        int fd = rtbkit_fd(ba);
-
         pollfd pfd {
-            fd, POLLIN, 0
+            ba.fd(), POLLIN, 0
         };
 
         int n = poll(&pfd, 1, 0);
