@@ -517,8 +517,10 @@ parseBidRequest(HttpAuctionHandler & connection,
     // parse Impression array
     ParseGbrAdSlot(gbr, br);
 
-    if (gbr.has_detected_language())
-        device.language = gbr.detected_language();
+    if (gbr.detected_language_size())
+    {   // TODO when gbr.detected_language_size()>1
+        device.language = gbr.detected_language(0);
+    }
 
     // detected verticals:
     if (gbr.detected_vertical_size() > 0)
@@ -690,6 +692,11 @@ getCreativeCompatibility(const Creative & creative,
 
     auto crinfo = std::make_shared<CreativeInfo>();
 
+    if (!creative.providerConfig.isMember("adx")) {
+        result.setIncompatible();
+        return result;
+    }
+
     const Json::Value & pconf = creative.providerConfig["adx"];
 
     // 1.  Must have adx.externalId containing creative attributes.
@@ -755,8 +762,10 @@ getCreativeCompatibility(const Creative & creative,
         });
     }
 
-    // Cache the information
-    result.info = crinfo;
+    if (result.isCompatible) {
+        // Cache the information
+        result.info = crinfo;
+    }
 
     return result;
 }
