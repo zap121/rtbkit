@@ -17,11 +17,11 @@ struct rtbkit_object;
  * RTBkit factory
  */
 
-rtbkit_handle * rtbkit_initialize(char const * bootstrap);
-void rtbkit_shutdown(rtbkit_handle * handle);
+struct rtbkit_handle * rtbkit_initialize(char const * bootstrap);
+void rtbkit_shutdown(struct rtbkit_handle * handle);
 
-rtbkit_object * rtbkit_create_bidding_agent(rtbkit_handle * handle, char const * name);
-void rtbkit_release(rtbkit_object * handle);
+struct rtbkit_object * rtbkit_create_bidding_agent(struct rtbkit_handle * handle, char const * name);
+void rtbkit_release(struct rtbkit_object * handle);
 
 /*
  * RTBkit events polling
@@ -37,19 +37,19 @@ enum rtbkit_events {
 };
 
 struct rtbkit_event {
-    rtbkit_object * subject;
-    rtbkit_events type;
+    struct rtbkit_object * subject;
+    enum rtbkit_events type;
 };
 
-void rtbkit_next_event(rtbkit_object * handle, rtbkit_event ** event);
-void rtbkit_free_event(rtbkit_event * event);
-void rtbkit_send_event(rtbkit_event * event);
+void rtbkit_next_event(struct rtbkit_object * handle, struct rtbkit_event ** event);
+void rtbkit_free_event(struct rtbkit_event * event);
+void rtbkit_send_event(struct rtbkit_event * event);
 
 /*
  * RTBkit non blocking
  */
 
-int rtbkit_fd(rtbkit_object * handle);
+int rtbkit_fd(struct rtbkit_object * handle);
 
 /*
  * RTBkit structures
@@ -71,18 +71,18 @@ struct rtbkit_bid {
  */
 
 struct rtbkit_bidding_agent_config {
-    rtbkit_event base;
+    struct rtbkit_event base;
     char const * config;
 };
 
 struct rtbkit_event_bid_request {
-    rtbkit_event base;
-    rtbkit_bid_request request;
+    struct rtbkit_event base;
+    struct rtbkit_bid_request request;
 };
 
 struct rtbkit_event_bid_response {
-    rtbkit_event base;
-    rtbkit_bid bid;
+    struct rtbkit_event base;
+    struct rtbkit_bid bid;
 };
 
 #ifdef __cplusplus
