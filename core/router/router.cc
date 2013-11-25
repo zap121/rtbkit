@@ -2712,7 +2712,13 @@ submitToPostAuctionService(std::shared_ptr<Auction> auction,
     event.bidResponse = bid;
 
     Message<SubmittedAuctionEvent> message(std::move(event));
-    postAuctionEndpoint.sendMessage("AUCTION", message.toString());
+    // To String here will throw an exception
+    try {
+        postAuctionEndpoint.sendMessage("AUCTION", message.toString());
+    }
+    catch (...) {
+        cerr << "Unparseable JSON" << endl;
+    }
 
     if (auction.unique()) {
         auctionGraveyard.tryPush(auction);
