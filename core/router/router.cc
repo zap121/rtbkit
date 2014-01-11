@@ -5,6 +5,7 @@
    RTB router code.
 */
 
+#include <set>
 #include "router.h"
 #include "soa/service/zmq_utils.h"
 #include "jml/arch/backtrace.h"
@@ -23,7 +24,6 @@
 #include "jml/utils/exc_assert.h"
 #include "jml/db/persistent.h"
 #include "jml/utils/json_parsing.h"
-#include <boost/make_shared.hpp>
 #include "profiler.h"
 #include "rtbkit/core/banker/banker.h"
 #include "rtbkit/core/banker/null_banker.h"
@@ -117,6 +117,7 @@ Router(ServiceBase & parent,
       shutdown_(false),
       agentEndpoint(getZmqContext()),
       configBuffer(1024),
+      exchangeBuffer(64),
       startBiddingBuffer(65536),
       submittedBuffer(65536),
       auctionGraveyard(65536),
@@ -158,6 +159,7 @@ Router(std::shared_ptr<ServiceProxies> services,
       agentEndpoint(getZmqContext()),
       postAuctionEndpoint(getZmqContext()),
       configBuffer(1024),
+      exchangeBuffer(64),
       startBiddingBuffer(65536),
       submittedBuffer(65536),
       auctionGraveyard(65536),
@@ -528,7 +530,16 @@ run()
             times["doStartBidding"].add(microsecondsBetween(atEnd, atStart));
         }
 
-
+        {
+            std::shared_ptr<ExchangeConnector> exchange;
+            while (exchangeBuffer.tryPop(exchange)) {
+                for (auto & agent : agents) {
+                    configureAgentOnExchange(exchange,
+                                             agent.first,
+                                             *agent.second.config);
+                };
+            }
+        }
 
         {
             double atStart = getTime();
@@ -734,14 +745,14 @@ injectAuction(Auction::HandleAuction onAuctionFinished,
               double expiryTime,
               double lossTime)
 {
-    std::shared_ptr<Auction> auction
-        (new Auction(nullptr,
-                     onAuctionFinished,
-                     request,
-                     chomp(requestStr),
-                     requestStrFormat,
-                     Date::fromSecondsSinceEpoch(startTime),
-                     Date::fromSecondsSinceEpoch(expiryTime)));
+    auto auction = std::make_shared<Auction>(
+        nullptr,
+        onAuctionFinished,
+        request,
+        chomp(requestStr),
+        requestStrFormat,
+        Date::fromSecondsSinceEpoch(startTime),
+        Date::fromSecondsSinceEpoch(expiryTime));
 
     injectAuction(auction, lossTime);
 
@@ -833,35 +844,72 @@ logUsageMetrics(double period)
 {
     std::string p = std::to_string(period);
 
-    for(auto & item : agents) {
-        auto & info = item.second;
-        logMessage("USAGE", "AGENT", p, item.first,
-                                        info.config->account.toString(),
-                                        info.stats->intoFilters,
-                                         info.stats->passedStaticFilters,
-                                        info.stats->auctions,
-                                        info.stats->bids,
-                                        info.config->bidProbability);
+    for (auto it = lastAgentUsageMetrics.begin();
+         it != lastAgentUsageMetrics.end();) {
+        if (agents.count(it->first) == 0) {
+            it = lastAgentUsageMetrics.erase(it);
+        }
+        else {
+            it++;
+        }
     }
 
-    int numExchanges = 0;
-    int numRequests = 0;
-    int numAuctions = 0;
-    float acceptAuctionProbability = 0;
+    set<AccountKey> agentAccounts;
+    for (const auto & item : agents) {
+        auto & info = item.second;
+        const AccountKey & account = info.config->account;
+        if (!agentAccounts.insert(account).second) {
+            continue;
+        }
 
-    forAllExchanges([&](std::shared_ptr<ExchangeConnector> const & item) {
-        ++numExchanges;
-        numRequests += item->numRequests;
-        numAuctions += item->numAuctions;
-        acceptAuctionProbability += item->acceptAuctionProbability;
-    });
+        auto & last = lastAgentUsageMetrics[item.first];
 
-    logMessage("USAGE", "ROUTER", p, numRequests,
-                                     numAuctions,
-                                     numNoPotentialBidders,
-                                     numBids,
-                                     numAuctionsWithBid,
-                                     acceptAuctionProbability / numExchanges);
+        AgentUsageMetrics newMetrics(info.stats->intoFilters,
+                                     info.stats->passedStaticFilters,
+                                     info.stats->passedDynamicFilters,
+                                     info.stats->auctions,
+                                     info.stats->bids);
+        AgentUsageMetrics delta = newMetrics - last;
+
+        logMessage("USAGE", "AGENT", p, item.first,
+                   info.config->account.toString(),
+                   delta.intoFilters,
+                   delta.passedStaticFilters,
+                   delta.passedDynamicFilters,
+                   delta.auctions,
+                   delta.bids,
+                   info.config->bidProbability);
+
+        last = move(newMetrics);
+    }
+
+    {
+        RouterUsageMetrics newMetrics;
+        int numExchanges = 0;
+        float acceptAuctionProbability(0.0);
+
+        forAllExchanges([&](std::shared_ptr<ExchangeConnector> const & item) {
+            ++numExchanges;
+            newMetrics.numRequests += item->numRequests;
+            newMetrics.numAuctions += item->numAuctions;
+            acceptAuctionProbability += item->acceptAuctionProbability;
+        });
+        newMetrics.numBids = numBids;
+        newMetrics.numNoPotentialBidders = numNoPotentialBidders;
+        newMetrics.numAuctionsWithBid = numAuctionsWithBid;
+
+        RouterUsageMetrics delta = newMetrics - lastRouterUsageMetrics;
+
+        logMessage("USAGE", "ROUTER", p,
+                   delta.numRequests,
+                   delta.numAuctions,
+                   delta.numNoPotentialBidders,
+                   delta.numBids,
+                   delta.numAuctionsWithBid,
+                   acceptAuctionProbability / numExchanges);
+
+        lastRouterUsageMetrics = move(newMetrics);
+    }
 }
 
 void
@@ -1330,12 +1378,6 @@ doStartBidding(const std::shared_ptr<AugmentationInfo> & augInfo)
 
     try {
         Id auctionId = augInfo->auction->id;
-
-        if (augmentationLoop.currentlyAugmenting(auctionId)) {
-            throwException("doStartBidding.alreadyAugmenting",
-                           "auction with ID %s already preprocessing",
-                           auctionId.toString().c_str());
-        }
         if (inFlight.count(auctionId)) {
             throwException("doStartBidding.alreadyInFlight",
                            "auction with ID %s already in progress",
@@ -2720,28 +2762,28 @@ throwException(const std::string & key, const std::string & fmt, ...)
 
 void
 Router::
-debugAuctionImpl(const Id & auction, const std::string & type,
+debugAuctionImpl(const Id & auctionId, const std::string & type,
                  const std::vector<std::string> & args)
 {
     Date now = Date::now();
     boost::unique_lock<ML::Spinlock> guard(debugLock);
     AuctionDebugInfo & entry
-        = debugInfo.access(auction, now.plusSeconds(30.0));
+        = debugInfo.access(auctionId, now.plusSeconds(30.0));
 
     entry.addAuctionEvent(now, type, args);
 }
 
 void
 Router::
-debugSpotImpl(const Id & auction, const Id & spot, const std::string & type,
+debugSpotImpl(const Id & auctionId, const Id & spotId, const std::string & type,
               const std::vector<std::string> & args)
 {
     Date now = Date::now();
     boost::unique_lock<ML::Spinlock> guard(debugLock);
     AuctionDebugInfo & entry
-        = debugInfo.access(auction, now.plusSeconds(30.0));
+        = debugInfo.access(auctionId, now.plusSeconds(30.0));
 
-    entry.addSpotEvent(spot, now, type, args);
+    entry.addSpotEvent(spotId, now, type, args);
 }
 
 void
@@ -2754,12 +2796,12 @@ expireDebugInfo()
 
 void
 Router::
-dumpAuction(const Id & auction) const
+dumpAuction(const Id & auctionId) const
 {
     boost::unique_lock<ML::Spinlock> guard(debugLock);
-    auto it = debugInfo.find(auction);
+    auto it = debugInfo.find(auctionId);
     if (it == debugInfo.end()) {
-        //cerr << "*** unknown auction " << auction << " in "
+        //cerr << "*** unknown auction " << auctionId << " in "
         //     << debugInfo.size() << endl;
     }
     else it->second.dumpAuction();
@@ -2767,15 +2809,15 @@ dumpAuction(const Id & auction) const
 
 void
 Router::
-dumpSpot(const Id & auction, const Id & spot) const
+dumpSpot(const Id & auctionId, const Id & spotId) const
 {
     boost::unique_lock<ML::Spinlock> guard(debugLock);
-    auto it = debugInfo.find(auction);
+    auto it = debugInfo.find(auctionId);
     if (it == debugInfo.end()) {
-        //cerr << "*** unknown auction " << auction << " in "
+        //cerr << "*** unknown auction " << auctionId << " in "
         //     << debugInfo.size() << endl;
     }
-    else it->second.dumpSpot(spot);
+    else it->second.dumpSpot(spotId);
 }
 
 /** MonitorProvider interface */
@@ -2816,9 +2858,7 @@ startExchange(const std::string & type,
     std::shared_ptr<ExchangeConnector> item(exchange.release());
     addExchange(item);
 
-    for(auto i = agents.begin(), end = agents.end(); i != end; ++i) {
-        configureAgentOnExchange(item, i->first, *i->second.config);
-    }
+    exchangeBuffer.push(item);
 }
 
 void

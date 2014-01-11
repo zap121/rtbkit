@@ -552,7 +552,7 @@ fromJson(const Json::Value & val)
 
     // Rather than barf on unknown fields, for forwards compatibility we put them
     // in the unparseable array via this function
-    auto onUnknownField = [&] ()
+    auto onUnknownField = [&] (const ValueDescription*)
         {
             cerr << "(adspot)got unknown field " << context.printPath()
             << context.expectJson() << endl;
@@ -916,7 +916,8 @@ toJson() const
     addIfNotEmpty(result, "unparseable", unparseable);
     if (!bidCurrency.empty())
         result["bidCurrency"] = jsonEncode(bidCurrency);
-   
+    if (blockedCategories.size())
+    	result["blockedCategories"] = jsonEncode(blockedCategories);
     if (site) {
         toJsonValue(result["site"], *site);
     }
@@ -975,7 +976,7 @@ void fromJsonOptional(const Json::Value & val,
 
     // Rather than barf on unknown fields, for forwards compatibility we put them
     // in the unparseable array via this function
-    auto onUnknownField = [&] ()
+    auto onUnknownField = [&] (const ValueDescription*)
         {
             std::function<Json::Value & (int, Json::Value &)> getEntry
             = [&] (int n, Json::Value & curr) -> Json::Value &

@@ -389,6 +389,7 @@ public:
     Agents agents;
 
     ML::RingBufferSRMW<std::pair<std::string, std::shared_ptr<const AgentConfig> > > configBuffer;
+    ML::RingBufferSRMW<std::shared_ptr<ExchangeConnector> > exchangeBuffer;
     ML::RingBufferSRMW<std::shared_ptr<AugmentationInfo> > startBiddingBuffer;
     ML::RingBufferSRMW<std::shared_ptr<Auction> > submittedBuffer;
     ML::RingBufferSWMR<std::shared_ptr<Auction> > auctionGraveyard;
@@ -594,6 +595,81 @@ public:
     }
 
 
+    /************************************************************************/
+    /* USAGE METRICS                                                        */
+    /************************************************************************/
+
+    struct AgentUsageMetrics {
+        AgentUsageMetrics()
+            : intoFilters(0), passedStaticFilters(0), passedDynamicFilters(0),
+              auctions(0), bids(0)
+        {}
+
+        AgentUsageMetrics(uint64_t intoFilters,
+                          uint64_t passedStaticFilters,
+                          uint64_t passedDynamicFilters,
+                          uint64_t auctions,
+                          uint64_t bids)
+            : intoFilters(intoFilters),
+              passedStaticFilters(passedStaticFilters),
+              passedDynamicFilters(passedDynamicFilters),
+              auctions(auctions),
+              bids(bids)
+        {}
+
+        AgentUsageMetrics operator - (const AgentUsageMetrics & other)
+            const
+        {
+            AgentUsageMetrics result(*this);
+
+            result.intoFilters -= other.intoFilters;
+            result.passedStaticFilters -= other.passedStaticFilters;
+            result.passedDynamicFilters -= other.passedDynamicFilters;
+            result.auctions -= other.auctions;
+            result.bids -= other.bids;
+
+            return result;
+        };
+
+        uint64_t intoFilters;
+        uint64_t passedStaticFilters;
+        uint64_t passedDynamicFilters;
+        uint64_t auctions;
+        uint64_t bids;
+    };
+
+    struct RouterUsageMetrics {
+        RouterUsageMetrics()
+            : numRequests(0), numAuctions(0), numNoPotentialBidders(0),
+              numBids(0), numAuctionsWithBid(0)
+        {}
+
+        RouterUsageMetrics operator - (const RouterUsageMetrics & other)
+            const
+        {
+            RouterUsageMetrics result(*this);
+
+            result.numRequests -= other.numRequests;
+            result.numAuctions -= other.numAuctions;
+            result.numNoPotentialBidders -= other.numNoPotentialBidders;
+            result.numBids -= other.numBids;
+            result.numAuctionsWithBid -= other.numAuctionsWithBid;
+
+            return result;
+        };
+
+        uint64_t numRequests;
+        uint64_t numAuctions;
+        uint64_t numNoPotentialBidders;
+        uint64_t numBids;
+        uint64_t numAuctionsWithBid;
+    };
+
+    void logUsageMetrics(double period);
+
+    std::map<std::string, AgentUsageMetrics> lastAgentUsageMetrics;
+    RouterUsageMetrics lastRouterUsageMetrics;
+
     /*************************************************************************/
     /* DATA LOGGING                                                          */
     /*************************************************************************/
@@ -603,8 +679,6 @@ public:
 
     /** Log bids */
     bool logBids;
-
-    void logUsageMetrics(double period);
 
     /** Log a given message to the given channel. */
     template<typename... Args>
@@ -628,36 +702,36 @@ public:
     /* DEBUGGING                                                             */
     /*************************************************************************/
 
-    void debugAuction(const Id & auction, const std::string & type,
+    void debugAuction(const Id & auctionId, const std::string & type,
                       const std::vector<std::string> & args
                       = std::vector<std::string>())
     {
         if (JML_LIKELY(!doDebug)) return;
-        debugAuctionImpl(auction, type, args);
+        debugAuctionImpl(auctionId, type, args);
     }
 
-    void debugAuctionImpl(const Id & auction, const std::string & type,
+    void debugAuctionImpl(const Id & auctionId, const std::string & type,
                           const std::vector<std::string> & args);
 
-    void debugSpot(const Id & auction,
-                   const Id & spot,
+    void debugSpot(const Id & auctionId,
+                   const Id & spotId,
                    const std::string & type,
                    const std::vector<std::string> & args
                        = std::vector<std::string>())
     {
         if (JML_LIKELY(!doDebug)) return;
-        debugSpotImpl(auction, spot, type, args);
+        debugSpotImpl(auctionId, spotId, type, args);
     }
 
-    void debugSpotImpl(const Id & auction,
-                       const Id & spot,
+    void debugSpotImpl(const Id & auctionId,
+                       const Id & spotId,
                        const std::string & type,
                        const std::vector<std::string> & args);
 
     void expireDebugInfo();
 
-    void dumpAuction(const Id & auction) const;
-    void dumpSpot(const Id & auction, const Id & spot) const;
+    void dumpAuction(const Id & auctionId) const;
+    void dumpSpot(const Id & auctionId, const Id & spotId) const;
 
     Date getCurrentTime() const { return Date::now(); }
 
