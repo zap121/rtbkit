@@ -55,6 +55,12 @@ struct DefaultDescription<AppNexus::BidRequestMsg>
 };
 
 template<>
+struct DefaultDescription<AppNexus::BidRequest>
+    : public StructureDescription<AppNexus::BidRequest> {
+    DefaultDescription();
+};
+
+template<>
 struct DefaultDescription<AppNexus::BidInfo>
     : public StructureDescription<AppNexus::BidInfo> {
     DefaultDescription();

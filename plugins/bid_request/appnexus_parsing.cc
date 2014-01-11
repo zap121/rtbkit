@@ -13,6 +13,13 @@ using namespace std;
 
 namespace Datacratic {
 
+DefaultDescription<AppNexus::BidRequest>::
+DefaultDescription()
+{
+    collectUnparseableJson(&AppNexus::BidRequest::unparseable);
+    addField("bid_request", &AppNexus::BidRequest::bidRequest, "Bid Request");
+}
+
 DefaultDescription<AppNexus::BidRequestMsg>::
 DefaultDescription()
 {
