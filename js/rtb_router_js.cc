@@ -230,7 +230,7 @@ struct RTBRouterStackJS
     {
         HandleScope scope;
 
-        auto_ptr<CallbackData> data((CallbackData *)req->data);
+        unique_ptr<CallbackData> data((CallbackData *)req->data);
 
         TryCatch try_catch;
 

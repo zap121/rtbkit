@@ -2378,7 +2378,7 @@ updateAllAgents()
 {
     for (;;) {
 
-        auto_ptr<AllAgentInfo> newInfo(new AllAgentInfo);
+        unique_ptr<AllAgentInfo> newInfo(new AllAgentInfo);
 
         AllAgentInfo * current = allAgents;
 
