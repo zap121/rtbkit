@@ -188,6 +188,30 @@ DefaultDescription()
     addField("storeurl", &AppInfo::storeurl, "App store url");
 }
 
+struct PermissiveStringValueDescription
+    : public ValueDescriptionT<std::string> {
+
+    virtual void parseJsonTyped(std::string * val,
+                                JsonParsingContext & context) const
+    {
+        if (context.isNumber())
+            *val = std::to_string(context.expectInt());
+        else *val = context.expectStringAscii();
+    }
+    
+    virtual void printJsonTyped(const std::string * val,
+                                JsonPrintingContext & context) const
+    {
+        context.writeString(*val);
+    }
+
+    virtual bool isDefaultTyped(const std::string * val) const
+    {
+        return val->empty();
+    }
+};
+
+
 DefaultDescription<OpenRTB::Geo>::
 DefaultDescription()
 {
@@ -196,7 +220,8 @@ DefaultDescription()
     addField("country", &Geo::country, "ISO 3166-1 country code");
     addField("region", &Geo::region, "ISO 3166-2 Region code");
     addField("regionfips104", &Geo::regionfips104, "FIPS 10-4 region code");
-    addField("metro", &Geo::metro, "Metropolitan region (Google Metro code");
+    addField("metro", &Geo::metro, "Metropolitan region (Google Metro code",
+             new PermissiveStringValueDescription());
     addField("city", &Geo::city, "City name (UN Code for Trade and Transport)");
     addField("zip", &Geo::zip, "Zip or postal code");
     addField("type", &Geo::type, "Source of location data");
