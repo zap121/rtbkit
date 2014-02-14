@@ -132,6 +132,12 @@ fromOpenRtb(OpenRTB::BidRequest && req,
             result->url = result->site->page;
         else if (result->site->id)
             result->url = Url("http://" + result->site->id.toString() + ".siteid/");
+        for (auto & s: result->site->cat)
+            result->segments.add("iab-categories", s.val);
+        for (auto s: result->site->sectioncat)
+            result->segments.add("iab-categories", s.val);
+        for (auto s: result->site->pagecat)
+            result->segments.add("iab-categories", s.val);
     }
     else if (req.app) {
         result->app.reset(req.app.release());
@@ -140,6 +146,8 @@ fromOpenRtb(OpenRTB::BidRequest && req,
             result->url = Url(result->app->bundle);
         else if (result->app->id)
             result->url = Url("http://" + result->app->id.toString() + ".appid/");
+        for (auto & s: result->app->cat)
+            result->segments.add("iab-categories", s.val);
     }
 
     if (req.device) {
