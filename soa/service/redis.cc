@@ -49,6 +49,9 @@ const Command DEL("DEL");
 const Command SADD("SADD");
 const Command SMEMBERS("SMEMBERS");
 const Command TTL("TTL");
+const Command AUTH("AUTH");
+const Command SELECT("SELECT");
+
 
 /*****************************************************************************/
 /* REPLY                                                                     */
@@ -753,6 +756,64 @@ test()
     while (!done)
         futex_wait(done, 0);
     
+    if (error != "")
+        throw ML::Exception("couldn't connect to Redis: " + error);
+}
+
+void
+AsyncConnection::
+auth(std::string password)
+{
+    int done = 0;
+
+    string error;
+
+    auto onResponse = [&] (const Redis::Result & result)
+        {
+            if (result) {
+                std::cout << "got reply " << result.reply() << endl;
+            }
+            else error = result.error();
+            done = 1;
+            futex_wake(done);
+        };
+
+    Command authCmd(AUTH);
+    authCmd.addArg(password);
+    queue(authCmd, onResponse, 2.0);
+
+    while (!done)
+        futex_wait(done, 0);
+
+    if (error != "")
+        throw ML::Exception("couldn't connect to Redis: " + error);
+}
+
+void
+AsyncConnection::
+select(int database)
+{
+    int done = 0;
+
+    string error;
+
+    auto onResponse = [&] (const Redis::Result & result)
+        {
+            if (result) {
+                std::cout << "got reply " << result.reply() << endl;
+            }
+            else error = result.error();
+            done = 1;
+            futex_wake(done);
+        };
+
+    Command cmd(SELECT);
+    cmd.addArg(database);
+    queue(cmd, onResponse, 2.0);
+
+    while (!done)
+        futex_wait(done, 0);
+
     if (error != "")
         throw ML::Exception("couldn't connect to Redis: " + error);
 }
