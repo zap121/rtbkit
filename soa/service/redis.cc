@@ -786,7 +786,7 @@ auth(std::string password)
         futex_wait(done, 0);
 
     if (error != "")
-        throw ML::Exception("couldn't connect to Redis: " + error);
+        throw ML::Exception("couldn't authenticate redis connection: " + error);
 }
 
 void
@@ -815,7 +815,7 @@ select(int database)
         futex_wait(done, 0);
 
     if (error != "")
-        throw ML::Exception("couldn't connect to Redis: " + error);
+        throw ML::Exception("couldn't select redis database: " + error);
 }
 
 
